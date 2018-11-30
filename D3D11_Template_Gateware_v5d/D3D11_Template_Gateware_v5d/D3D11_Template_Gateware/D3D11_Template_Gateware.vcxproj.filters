@@ -53,4 +53,12 @@
       <UniqueIdentifier>{b6c72e31-647e-44cd-a60d-0b316676c04d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="myPshader.hlsl">
+      <Filter>Gateware Source</Filter>
+    </FxCompile>
+    <FxCompile Include="myVshader.hlsl">
+      <Filter>Gateware Source</Filter>
+    </FxCompile>
+  </ItemGroup>
 </Project>
