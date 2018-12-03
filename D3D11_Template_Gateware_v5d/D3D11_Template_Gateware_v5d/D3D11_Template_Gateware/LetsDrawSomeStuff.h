@@ -2,12 +2,16 @@
 #pragma once
 // Include our DX11 middle ware
 #include "Gateware Redistribution R5d/Interface/G_Graphics/GDirectX11Surface.h"
+//#include "Gateware Redistribution R5d\Interface\G_Math\GMatrix.h"
+#include "Gateware Redistribution R5d/Interface/G_Math/GMatrix.h"
 
 // Include DirectX11 for interface access
 #include <d3d11.h>
 
 #include "myPshader.csh"
 #include "myVshader.csh"
+
+using namespace GW::MATH;
 
 // Simple Container class to make life easier/cleaner
 class LetsDrawSomeStuff
@@ -20,19 +24,34 @@ class LetsDrawSomeStuff
 	ID3D11DeviceContext *myContext = nullptr;
 	
 	struct myVertex
-	{
+	{	
 		float xyzw[4];
 		float rgba[4];
 	};
 
-	ID3D11Buffer * vBuffer; 
-	ID3D11InputLayout* vLayout;
-	ID3D11VertexShader* vShader; //hlsl
-	ID3D11PixelShader* pShader; //hlsl
-
-
+	struct ConstantBuffer
+	{
+		GMATRIXF mWorld;
+		GMATRIXF mView; 
+		GMATRIXF mProjection;
+	};
 
 	// TODO: Add your own D3D11 variables here (be sure to "Release()" them when done!)
+	//Buffers
+	ID3D11Buffer * vBuffer;
+	ID3D11Buffer * iBuffer; 
+	ID3D11Buffer * cBuffer; 
+	//Shaders
+	ID3D11VertexShader* vShader; //hlsl
+	ID3D11PixelShader* pShader; //hlsl	
+	//Layout
+	ID3D11InputLayout* vLayout;
+	//confusing matrix function pointer thing. 
+	GMatrix *matrixFunctions;
+	//Matrices and Vectors
+	GMATRIXF myWorldMatrix;
+	GMATRIXF myViewMatrix;
+	GMATRIXF myProjectionMatrix;
 
 public:
 	// Init
@@ -56,14 +75,30 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			mySurface->GetSwapchain((void**)&mySwapChain);
 			mySurface->GetContext((void**)&myContext);
 
+			CreateGMatrix(&matrixFunctions);
 			// TODO: Create new DirectX stuff here! (Buffers, Shaders, Layouts, Views, Textures, etc...)
 
-			myVertex tri[] 
+			//myVertex tri[] 
+			//{ //xyzq, rgba
+			//	{{0,0.5f,0,1},{1,1,1,1} },
+			//	{{0.5f, -0.5f, 0, 1}, {1,1,1,1} },
+			//	{{-0.5, -0.5f, 0, 1}, {1,1,1,1} }
+			//};
+	
+			myVertex tri[]
 			{ //xyzq, rgba
-				{{0,0.5f,0,1},{1,1,1,1} },
-				{{0.5f, -0.5f, 0, 1}, {1,1,1,1} },
-				{{-0.5, -0.5f, 0, 1}, {1,1,1,1} }
+				{ { -0.5f,0.5,-0.5,1 } , { 1,1,1,1 } },
+				{ { 0.5f,0.5,-0.5,1 } ,  { 1,1,1,1 } },
+				{ { 0.5f,0.5,0.5,1 } ,   { 1,1,1,1 } },
+				{ { -0.5f,0.5,0.5,1 } ,  { 1,1,1,1 } },
+				{ { -0.5f,-0.5,-0.5,1 }, { 1,1,1,1 } },
+				{ { 0.5f,-0.5,-0.5,1 } , { 1,1,1,1 } },
+				{ { 0.5f,-0.5,0.5,1 } ,  { 1,1,1,1 } },
+				{ { -0.5f,-0.5,0.5,1 } , { 1,1,1,1 } }
+
 			};
+
+			
 
 			//load it to the card
 			D3D11_BUFFER_DESC bDesc;
@@ -72,7 +107,7 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			ZeroMemory(&subData, sizeof(subData));
 
 			bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER; 
-			bDesc.ByteWidth = sizeof(myVertex) * 3;
+			bDesc.ByteWidth = sizeof(myVertex) * 8;
 			bDesc.CPUAccessFlags = 0; 
 			bDesc.MiscFlags = 0;
 			bDesc.StructureByteStride = 0; 
@@ -83,6 +118,7 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			myDevice->CreateBuffer(&bDesc, &subData, &vBuffer); 
 			
 			//write and compile & load our shaders
+
 			myDevice->CreateVertexShader(myVshader, sizeof(myVshader), nullptr, &vShader);
 			myDevice->CreatePixelShader(myPshader, sizeof(myPshader), nullptr, &pShader); 
 			
@@ -90,10 +126,71 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			D3D11_INPUT_ELEMENT_DESC ieDesc[] = 
 			{
 				{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-				{"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+				{"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			};
 
+			// THIS LINE GOES INTO THE CREATEINPUT layout to simplify hardcording
+			//UINT numberOfElements = ARRAYSIZE(ieDesc); 
+
+			// Create the input layout 
 			myDevice->CreateInputLayout(ieDesc, 2, myVshader, sizeof(myVshader), &vLayout); 
+
+			//Create Index Buffer
+			WORD indices[] =
+			{
+			    3,1,0,
+			    2,1,3,
+
+			    0,5,4,
+			    1,5,0,
+
+			    3,4,7,
+			    0,4,3,
+
+			    1,6,5,
+			    2,6,1,
+
+			    2,7,6,
+			    3,7,2,
+
+			    6,4,5,
+			    7,4,6,
+			};
+
+			bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+			bDesc.ByteWidth = sizeof( WORD) * 36;
+			bDesc.CPUAccessFlags = 0;
+			bDesc.MiscFlags = 0;
+			bDesc.StructureByteStride = 0;
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			subData.pSysMem = indices;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &iBuffer);
+
+			// Create Constant Buffer
+			bDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			bDesc.ByteWidth = sizeof(ConstantBuffer);
+			bDesc.CPUAccessFlags = 0;
+			bDesc.MiscFlags = 0;
+			bDesc.StructureByteStride = 0;
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+
+			myDevice->CreateBuffer(&bDesc, nullptr, &cBuffer);
+
+
+			//init World Matrix
+			matrixFunctions->IdentityF(myWorldMatrix);
+
+			//init View Matrix
+			GVECTORF eye = { 0.0f, 1.0f, -5.0f, 0.0f };
+			GVECTORF at = { 0.0f, 1.0f, 0.0f, 0.0f };
+			GVECTORF up = { 0.0f, 1.0f, 0.0f, 0.0f };
+			matrixFunctions->LookAtLHF(eye, at, up, myViewMatrix);
+			
+			//init Projection Matrix
+			float aspectR;
+			mySurface->GetAspectRatio(aspectR);
+			matrixFunctions->ProjectionLHF(1.5708f, aspectR, 0.01f, 100.0f, myProjectionMatrix);
 
 		}
 	}
@@ -110,6 +207,11 @@ LetsDrawSomeStuff::~LetsDrawSomeStuff()
 	// TODO: "Release()" more stuff here!
 
 	vBuffer->Release(); 
+	iBuffer->Release(); 
+	cBuffer->Release(); 
+	vShader->Release(); 
+	pShader->Release(); 
+	vLayout->Release(); 
 
 	if (mySurface) // Free Gateware Interface
 	{
@@ -143,21 +245,40 @@ void LetsDrawSomeStuff::Render()
 			const float d_green[] = { 0, 0.5f, 0, 1 };
 			myContext->ClearRenderTargetView(myRenderTargetView, d_green);
 			
+			//SetUp the Pipeline
 
 			myContext->IASetInputLayout(vLayout);
 
+			//set Vertex Buffer
 			UINT strides[] = { sizeof(myVertex) };
 			UINT offsets[] = { 0 }; 
 			ID3D11Buffer *tempVB[] = { vBuffer };
-
 			myContext->IASetVertexBuffers(0, 1, tempVB, strides, offsets);
 			myContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+			//set Index Buffer
+			myContext->IASetIndexBuffer(iBuffer, DXGI_FORMAT_R16_UINT, 0);
+
 			// TODO: Set your shaders, Update & Set your constant buffers, Attatch your vertex & index buffers, Set your InputLayout & Topology & Draw!
+			//Vertex shader
 			myContext->VSSetShader(vShader, 0, 0);
+			//Pixel Shader					
 			myContext->PSSetShader(pShader, 0, 0); 
 
-			myContext->Draw(3, 0); 
+			//Updates variables and constant buff
+			ConstantBuffer constBuff;
+			matrixFunctions->TransposeF(myWorldMatrix, constBuff.mWorld);
+			matrixFunctions->TransposeF(myViewMatrix, constBuff.mView);
+			matrixFunctions->TransposeF(myProjectionMatrix, constBuff.mProjection);
+			myContext->UpdateSubresource(cBuffer, 0, nullptr, &constBuff, 0, 0);
+			myContext->VSSetConstantBuffers(0, 1, &cBuffer);
+			
+			
+			myContext->DrawIndexed(12, 0, 0); 
+			//myContext->Draw(8, 0); 
+
+			//step 1 expand inputlayout to have what i want
+			
 
 			// try to make triagle 3d 
 				//1. make into a pyrimid(more verts) 
