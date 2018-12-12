@@ -116,6 +116,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="LetsDrawSomeStuff.h" />
+    <ClInclude Include="XTime.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Gateware Redistribution R5d\Source\G_Audio\GAudio.cpp" />
@@ -133,6 +134,7 @@
     <ClCompile Include="Gateware Redistribution R5d\Source\G_System\GLog.cpp" />
     <ClCompile Include="Gateware Redistribution R5d\Source\G_System\GWindow.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="XTime.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="myPshader.hlsl">

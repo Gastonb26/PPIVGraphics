@@ -44,9 +44,15 @@
     <ClCompile Include="Gateware Redistribution R5d\Source\G_System\GWindow.cpp">
       <Filter>Gateware Source</Filter>
     </ClCompile>
+    <ClCompile Include="XTime.cpp">
+      <Filter>Gateware Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LetsDrawSomeStuff.h" />
+    <ClInclude Include="XTime.h">
+      <Filter>Gateware Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Gateware Source">

@@ -2,16 +2,20 @@
 #pragma once
 // Include our DX11 middle ware
 #include "Gateware Redistribution R5d/Interface/G_Graphics/GDirectX11Surface.h"
-//#include "Gateware Redistribution R5d\Interface\G_Math\GMatrix.h"
-#include "Gateware Redistribution R5d/Interface/G_Math/GMatrix.h"
+#include "Gateware Redistribution R5d\Interface\G_Math\GMatrix.h"
+#include "Gateware Redistribution R5d\Interface\G_System\GInput.h"
 
 // Include DirectX11 for interface access
 #include <d3d11.h>
+#include <DirectXMath.h>
 
 #include "myPshader.csh"
 #include "myVshader.csh"
+#include "XTime.h"
 
+using namespace DirectX;
 using namespace GW::MATH;
+using namespace GW::SYSTEM;
 
 // Simple Container class to make life easier/cleaner
 class LetsDrawSomeStuff
@@ -22,10 +26,12 @@ class LetsDrawSomeStuff
 	ID3D11Device *myDevice = nullptr;
 	IDXGISwapChain *mySwapChain = nullptr;
 	ID3D11DeviceContext *myContext = nullptr;
+	GInput *inputManager; 
 	
 	struct myVertex
 	{	
 		float xyzw[4];
+		float Normal[3]; 
 		float rgba[4];
 	};
 
@@ -34,7 +40,11 @@ class LetsDrawSomeStuff
 		GMATRIXF mWorld;
 		GMATRIXF mView; 
 		GMATRIXF mProjection;
+		GVECTORF vLightDir;  
+		GVECTORF vLightCol; 
+		GVECTORF vOutputCol; 
 	};
+
 
 	// TODO: Add your own D3D11 variables here (be sure to "Release()" them when done!)
 	//Buffers
@@ -52,6 +62,10 @@ class LetsDrawSomeStuff
 	GMATRIXF myWorldMatrix;
 	GMATRIXF myViewMatrix;
 	GMATRIXF myProjectionMatrix;
+
+	//GInput *inputMan; Learn how to use this. 
+	float camX, camZ;
+	XTime timer; 
 
 public:
 	// Init
@@ -77,14 +91,15 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 
 			CreateGMatrix(&matrixFunctions);
 			// TODO: Create new DirectX stuff here! (Buffers, Shaders, Layouts, Views, Textures, etc...)
+			
 
-			//myVertex tri[] 
-			//{ //xyzq, rgba
-			//	{{0,0.5f,0,1},{1,1,1,1} },
-			//	{{0.5f, -0.5f, 0, 1}, {1,1,1,1} },
-			//	{{-0.5, -0.5f, 0, 1}, {1,1,1,1} }
-			//};
-	
+			//Sets Up GInput Manager
+			HWND wind; 
+			attatchPoint->GetWindowHandle(sizeof(wind), (void**)&wind);
+			CreateGInput(wind, sizeof(wind), &inputManager);
+
+			timer.Restart(); 
+
 			myVertex tri[]
 			{ //xyzq, rgba
 				{ { -0.5f,0.5,-0.5,1 } , { 1,1,1,1 } },
@@ -94,11 +109,9 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 				{ { -0.5f,-0.5,-0.5,1 }, { 1,1,1,1 } },
 				{ { 0.5f,-0.5,-0.5,1 } , { 1,1,1,1 } },
 				{ { 0.5f,-0.5,0.5,1 } ,  { 1,1,1,1 } },
-				{ { -0.5f,-0.5,0.5,1 } , { 1,1,1,1 } }
+				{ { -0.5f,-0.5,0.5,1 } , { 1,1,1,1 } },
 
 			};
-
-			
 
 			//load it to the card
 			D3D11_BUFFER_DESC bDesc;
@@ -191,7 +204,7 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			float aspectR;
 			mySurface->GetAspectRatio(aspectR);
 			matrixFunctions->ProjectionLHF(1.5708f, aspectR, 0.01f, 100.0f, myProjectionMatrix);
-
+	
 		}
 	}
 }
@@ -245,6 +258,48 @@ void LetsDrawSomeStuff::Render()
 			const float d_green[] = { 0, 0.5f, 0, 1 };
 			myContext->ClearRenderTargetView(myRenderTargetView, d_green);
 			
+			/////////////////LIGHTING//////////////////////////////
+			GVECTORF lightDirection = { 0.0f, 0.0f, -1.0f, 1.0f }; 
+
+			GVECTORF lightColor = { 0.0f, 0.0f, 1.0f, 1.0f }; 
+			///////////////////////////////////////////////////////
+			GVECTORF FowardBack = { 0.0f, 0.0f, 1.0f, 0.0f };
+			GVECTORF LeftRight = { 1.0f, 0.0f, 0.0f, 0.0f };
+			//Get Input To update camera
+			if (GetAsyncKeyState('W'))
+			{
+				camZ += .01f;
+
+			}
+			else if (GetAsyncKeyState('S'))
+			{
+				camZ -= .01f;
+			}
+			if (GetAsyncKeyState('D'))
+			{
+				camX += .01f;
+			}
+			else if (GetAsyncKeyState('A'))
+			{
+				camZ -= .01f;
+			}	
+			//Update Camera
+			GVECTORF move = { camX, 0, camZ, 1 };
+			GMATRIXF trans;
+			matrixFunctions->IdentityF(trans); 
+			matrixFunctions->TranslatelocalF(trans, move, trans);
+			GMATRIXF tempView = myViewMatrix;			
+			GMATRIXF complete;
+			matrixFunctions->MultiplyMatrixF(trans,tempView,complete);
+			//matrixFunctions->InverseF(complete, myViewMatrix);
+			myViewMatrix = complete; 
+			float aspectR;
+			mySurface->GetAspectRatio(aspectR);
+			matrixFunctions->ProjectionLHF(1.5708f, aspectR, 0.01f, 100.0f, myProjectionMatrix);
+			camX = 0; 
+			camZ = 0; 
+			//////////////////////////////////////////////////////////
+
 			//SetUp the Pipeline
 
 			myContext->IASetInputLayout(vLayout);
@@ -267,30 +322,21 @@ void LetsDrawSomeStuff::Render()
 
 			//Updates variables and constant buff
 			ConstantBuffer constBuff;
+
 			matrixFunctions->TransposeF(myWorldMatrix, constBuff.mWorld);
 			matrixFunctions->TransposeF(myViewMatrix, constBuff.mView);
 			matrixFunctions->TransposeF(myProjectionMatrix, constBuff.mProjection);
+
+			constBuff.vLightDir = lightDirection; 
+
+
+
 			myContext->UpdateSubresource(cBuffer, 0, nullptr, &constBuff, 0, 0);
 			myContext->VSSetConstantBuffers(0, 1, &cBuffer);
 			
 			
-			myContext->DrawIndexed(12, 0, 0); 
+			myContext->DrawIndexed(36, 0, 0); 
 			//myContext->Draw(8, 0); 
-
-			//step 1 expand inputlayout to have what i want
-			
-
-			// try to make triagle 3d 
-				//1. make into a pyrimid(more verts) 
-				
-				//make a world view & projection matrix
-
-				// upload those matrices to the video card
-					//create and update a constant buffer (move variables from c++ to shaders)
-
-				//apply matrix math in vertex Shader
-
-
 
 			// Present Backbuffer using Swapchain object
 			// Framerate is currently unlocked, we suggest "MSI Afterburner" to track your current FPS and memory usage.
