@@ -1,4 +1,3 @@
-﻿C:\Users\Gaston Blanco\Desktop\PortfolioIV\D3D11_Template_Gateware_v5d\D3D11_Template_Gateware_v5d\D3D11_Template_Gateware\myVshader.hlsl(38,30-42): warning X3081: comma expression used where a vector constructor may have been intended
-C:\Users\Gaston Blanco\Desktop\PortfolioIV\D3D11_Template_Gateware_v5d\D3D11_Template_Gateware_v5d\D3D11_Template_Gateware\myVshader.hlsl(38,2-55): error X3017: cannot implicitly convert from 'const float3' to 'float4'
+﻿C:\Users\Gaston Blanco\Desktop\PortfolioIV\D3D11_Template_Gateware_v5d\D3D11_Template_Gateware_v5d\D3D11_Template_Gateware\myVshader.hlsl(38,2-53): error X3017: cannot implicitly convert from 'const float3' to 'float4'
   
   compilation failed; no code produced

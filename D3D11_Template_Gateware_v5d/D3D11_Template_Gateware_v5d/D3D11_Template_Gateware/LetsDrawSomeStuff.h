@@ -329,8 +329,6 @@ void LetsDrawSomeStuff::Render()
 
 			constBuff.vLightDir = lightDirection; 
 
-
-
 			myContext->UpdateSubresource(cBuffer, 0, nullptr, &constBuff, 0, 0);
 			myContext->VSSetConstantBuffers(0, 1, &cBuffer);
 			
