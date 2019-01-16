@@ -1,0 +1,4 @@
+﻿  main.cpp
+c:\users\gaston blanco\desktop\ppiv\day1-setup\base codes\builds\d3d11_template_gateware_v5d\d3d11_template_gateware_v5d\d3d11_template_gateware\letsdrawsomestuff.h(218): warning C4244: 'argument': conversion from 'GW::GReturn' to 'float', possible loss of data
+  D3D11_Template_Gateware.vcxproj -> C:\Users\Gaston Blanco\Desktop\PPIV\Day1-Setup\Base Codes\Builds\D3D11_Template_Gateware_v5d\D3D11_Template_Gateware_v5d\x64\Debug\D3D11_Template_Gateware.exe
+  D3D11_Template_Gateware.vcxproj -> C:\Users\Gaston Blanco\Desktop\PPIV\Day1-Setup\Base Codes\Builds\D3D11_Template_Gateware_v5d\D3D11_Template_Gateware_v5d\x64\Debug\D3D11_Template_Gateware.pdb (Partial PDB)
