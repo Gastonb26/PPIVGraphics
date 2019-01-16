@@ -7,8 +7,10 @@
 // Include DirectX11 for interface access
 #include <d3d11.h>
 #include <DirectXMath.h>
+#include "DDSTextureLoader.h"
 #include "PS_shader.csh"
 #include "VS_shader.csh"
+#include "PS_texture.csh"
 #include "FitMetaknight00.h"
 
 using namespace DirectX;
@@ -17,7 +19,7 @@ struct myVertex
 {
 	XMFLOAT3 Position;
 	XMFLOAT3 Normal;
-	//XMFLOAT2 Tex;
+	XMFLOAT2 Tex;
 };
 
 struct ConstantBuffer
@@ -51,17 +53,19 @@ class LetsDrawSomeStuff
 
 	ID3D11VertexShader* myVertexShader = nullptr; 
 	ID3D11PixelShader* myPixelShader = nullptr; 
+	ID3D11PixelShader* myTextureShader = nullptr; 
 
 	ID3D11InputLayout* inputLayout = nullptr; 
 	D3D_DRIVER_TYPE DDT = D3D_DRIVER_TYPE_NULL; 
+	ID3D11SamplerState* samplerState; 
 
 	XMMATRIX worldMat; 
 	XMMATRIX viewMat;
 	XMMATRIX projectionMat;
 
-
 	ID3D11Buffer* metaVertexBuffer = nullptr;
 	ID3D11Buffer* metaIndexBuffer = nullptr;
+	ID3D11ShaderResourceView* textureResource; 
 	
 
 public:
@@ -91,11 +95,11 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			};
 
 			UINT numberOfElements = ARRAYSIZE(vLayout); 
 			myDevice->CreateInputLayout(vLayout, numberOfElements, VS_shader, sizeof(VS_shader), &inputLayout);
-
 
 			/// SECTION SHIT OFF
 			myVertex tri[]
@@ -204,6 +208,9 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 				tempMeta[i].Normal.x = FitMetaknight00_data[i].nrm[0];
 				tempMeta[i].Normal.y = FitMetaknight00_data[i].nrm[1];
 				tempMeta[i].Normal.z = FitMetaknight00_data[i].nrm[2];
+
+				tempMeta[i].Tex.x = FitMetaknight00_data[i].uvw[0];
+				tempMeta[i].Tex.y = FitMetaknight00_data[i].uvw[1];
 			}
 
 			bDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -215,7 +222,6 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 
 			myDevice->CreateBuffer(&bDesc, &subData, &metaVertexBuffer);
 
-			//FitMetaknight00_indicies[22242]
 
 			WORD* tempMetaIndices = new WORD[22242]; 
 			for (int i = 0; i < 22242; i++)
@@ -238,16 +244,26 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			constantBufferDesc.ByteWidth = sizeof(ConstantBuffer);
 			constantBufferDesc.CPUAccessFlags = 0;
 
-
-
 			myDevice->CreateBuffer(&constantBufferDesc, nullptr, &constantBuffer);
 
 
 			//write and compile & load our shaders
 			myDevice->CreatePixelShader(&PS_shader, sizeof(PS_shader), nullptr, &myPixelShader);
-
+			myDevice->CreatePixelShader(&PS_texture, sizeof(PS_texture), nullptr, &myTextureShader);
 			myDevice->CreateVertexShader(&VS_shader, sizeof(VS_shader), nullptr, &myVertexShader);
 
+			CreateDDSTextureFromFile(myDevice, L"metaTexture.dds", nullptr, &textureResource);
+			D3D11_SAMPLER_DESC sDesc = {}; 
+			sDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+			sDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+			sDesc.MinLOD = 0;
+			sDesc.MaxLOD = D3D11_FLOAT32_MAX;
+			myDevice->CreateSamplerState(&sDesc, &samplerState);
+
+			//INIT CAMERA
 			worldMat = XMMatrixIdentity();
 
 			//init View Matrix
@@ -257,7 +273,6 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			viewMat = XMMatrixLookAtLH(eye, at, up);
 
 			//init Projection Matrix
-
 			float aspectR;
 			
 			projectionMat = XMMatrixPerspectiveFovLH(XMConvertToRadians(65), mySurface->GetAspectRatio(aspectR), 0.01f, 100.0f);
@@ -279,6 +294,11 @@ LetsDrawSomeStuff::~LetsDrawSomeStuff()
 	constantBuffer->Release();
 	myVertexShader->Release(); 
 	myPixelShader->Release(); 
+	myTextureShader->Release(); 
+
+	textureResource->Release(); 
+	samplerState->Release(); 
+
 	metaVertexBuffer->Release(); 
 	metaIndexBuffer->Release(); 
 
@@ -318,7 +338,8 @@ void LetsDrawSomeStuff::Render()
 			myContext->ClearRenderTargetView(myRenderTargetView, d_green);
 			
 			// TODO: Set your shaders, Update & Set your constant buffers, Attatch your vertex & index buffers, Set your InputLayout & Topology & Draw!
-
+			//myContext->PSSetShaderResources(0, 1, &textureResource);
+			myContext->PSSetSamplers(0, 1, &samplerState);
 			myContext->IASetInputLayout(inputLayout);
 
 			UINT stride = sizeof(myVertex);
@@ -402,12 +423,14 @@ void LetsDrawSomeStuff::Render()
 				myContext->DrawIndexed(36, 0, 0);
 			}
 
+			myContext->PSSetShaderResources(0, 1, &textureResource);
+
 			XMMATRIX scaleDown = XMMatrixScaling(1/5.0f, 1 / 5.0f, 1 / 5.0f); 
 			constBuffer.mWorld = XMMatrixTranspose(worldMat * scaleDown * metaMat);
 			constBuffer.mView = XMMatrixTranspose(viewMat);
-			myContext->PSSetShader(myPixelShader, NULL, 0);
+			myContext->PSSetShader(myTextureShader, 0, 0);
 			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
-			constBuffer.vOutputCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+			//constBuffer.vOutputCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 			myContext->IASetVertexBuffers(0, 1, &tempBuffer[1], &stride, &offset);
 			myContext->IASetIndexBuffer(metaIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
 
@@ -415,18 +438,12 @@ void LetsDrawSomeStuff::Render()
 			//myContext->PSSetShader(myPixelShader, 0, 0);
 			////Vertex Shader					
 			//myContext->VSSetShader(myVertexShader, 0, 0);
-			myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
-			myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+			//myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+			//myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
 
 			myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
 			myContext->DrawIndexed(22242, 0, 0);
 			
-
-
-
-		
-
-
 
 			// Present Backbuffer using Swapchain object
 			// Framerate is currently unlocked, we suggest "MSI Afterburner" to track your current FPS and memory usage.

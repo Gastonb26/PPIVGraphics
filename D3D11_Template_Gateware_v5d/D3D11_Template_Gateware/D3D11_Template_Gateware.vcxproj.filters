@@ -44,10 +44,12 @@
     <ClCompile Include="Gateware Redistribution R5d\Source\G_System\GWindow.cpp">
       <Filter>Gateware Source</Filter>
     </ClCompile>
+    <ClCompile Include="DDSTextureLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LetsDrawSomeStuff.h" />
     <ClInclude Include="FitMetaknight00.h" />
+    <ClInclude Include="DDSTextureLoader.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Gateware Source">
@@ -57,5 +59,6 @@
   <ItemGroup>
     <FxCompile Include="PS_shader.hlsl" />
     <FxCompile Include="VS_shader.hlsl" />
+    <FxCompile Include="PS_texture.hlsl" />
   </ItemGroup>
 </Project>
