@@ -9,6 +9,7 @@
 #include <DirectXMath.h>
 #include "PS_shader.csh"
 #include "VS_shader.csh"
+#include "FitMetaknight00.h"
 
 using namespace DirectX;
 
@@ -30,6 +31,7 @@ struct ConstantBuffer
 };
 
 
+XMMATRIX metaMat = XMMatrixTranslation(0.0f, 4.0f, 0.0f); 
 float aspectR;
 
 // Simple Container class to make life easier/cleaner
@@ -57,6 +59,10 @@ class LetsDrawSomeStuff
 	XMMATRIX viewMat;
 	XMMATRIX projectionMat;
 
+
+	ID3D11Buffer* metaVertexBuffer = nullptr;
+	ID3D11Buffer* metaIndexBuffer = nullptr;
+	
 
 public:
 	// Init
@@ -90,6 +96,8 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			UINT numberOfElements = ARRAYSIZE(vLayout); 
 			myDevice->CreateInputLayout(vLayout, numberOfElements, VS_shader, sizeof(VS_shader), &inputLayout);
 
+
+			/// SECTION SHIT OFF
 			myVertex tri[]
 			{ //xyzq, rgba, uv 
 				{ XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
@@ -157,25 +165,19 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 				23,22,20
 			};
 
-
 			////USE THIS FOR SKYBOX INDEX
 			//WORD indices[] =
 			//{
 			//	3,1,0,
 			//	2,1,3,
-
 			//	6,4,5,
 			//	7,4,6,
-
 			//	11,9,8,
 			//	10,9,11,
-
 			//	14,12,13,
 			//	15,12,14,
-
 			//	19,17,16,
 			//	18,17,19,
-
 			//	22,20,21,
 			//	23,20,22
 			//};
@@ -188,6 +190,47 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 
 			myDevice->CreateBuffer(&bDesc, &subData, &indexBuffer);
 
+			/////SECTION END //////////////
+
+			// META KNIGHT SECTION
+
+			myVertex* tempMeta = new myVertex[5979]; 
+			for (int i = 0; i < 5979; i++)
+			{
+				tempMeta[i].Position.x = FitMetaknight00_data[i].pos[0];
+				tempMeta[i].Position.y = FitMetaknight00_data[i].pos[1];
+				tempMeta[i].Position.z = FitMetaknight00_data[i].pos[2];
+
+				tempMeta[i].Normal.x = FitMetaknight00_data[i].nrm[0];
+				tempMeta[i].Normal.y = FitMetaknight00_data[i].nrm[1];
+				tempMeta[i].Normal.z = FitMetaknight00_data[i].nrm[2];
+			}
+
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			bDesc.ByteWidth = sizeof(myVertex) * 5979;
+			bDesc.CPUAccessFlags = 0;
+
+			subData.pSysMem = tempMeta;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &metaVertexBuffer);
+
+			//FitMetaknight00_indicies[22242]
+
+			WORD* tempMetaIndices = new WORD[22242]; 
+			for (int i = 0; i < 22242; i++)
+			{
+				tempMetaIndices[i] = FitMetaknight00_indicies[i];
+			}
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+			bDesc.ByteWidth = sizeof(WORD) * 22242;
+			bDesc.CPUAccessFlags = 0;
+			subData.pSysMem = tempMetaIndices;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &metaIndexBuffer);
+
+
 			// Create Constant Buffer
 			D3D11_BUFFER_DESC constantBufferDesc = {};
 			constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -196,7 +239,9 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			constantBufferDesc.CPUAccessFlags = 0;
 
 
+
 			myDevice->CreateBuffer(&constantBufferDesc, nullptr, &constantBuffer);
+
 
 			//write and compile & load our shaders
 			myDevice->CreatePixelShader(&PS_shader, sizeof(PS_shader), nullptr, &myPixelShader);
@@ -234,6 +279,8 @@ LetsDrawSomeStuff::~LetsDrawSomeStuff()
 	constantBuffer->Release();
 	myVertexShader->Release(); 
 	myPixelShader->Release(); 
+	metaVertexBuffer->Release(); 
+	metaIndexBuffer->Release(); 
 
 	// TODO: "Release()" more stuff here!
 
@@ -277,7 +324,7 @@ void LetsDrawSomeStuff::Render()
 			UINT stride = sizeof(myVertex);
 			UINT offset = 0;
 
-			ID3D11Buffer *tempBuffer[] = { {vertexBuffer } };
+			ID3D11Buffer *tempBuffer[] = { {vertexBuffer }, {metaVertexBuffer} };
 
 
 			///////////////LIGHTS////////////////////
@@ -352,9 +399,33 @@ void LetsDrawSomeStuff::Render()
 				constBuffer.vOutputCol = vLightColors[m];
 				myContext->PSSetShader(myPixelShader, NULL, 0);
 				myContext->UpdateSubresource(constantBuffer, 0, NULL, &constBuffer, 0, 0);
-
 				myContext->DrawIndexed(36, 0, 0);
 			}
+
+			XMMATRIX scaleDown = XMMatrixScaling(1/5.0f, 1 / 5.0f, 1 / 5.0f); 
+			constBuffer.mWorld = XMMatrixTranspose(worldMat * scaleDown * metaMat);
+			constBuffer.mView = XMMatrixTranspose(viewMat);
+			myContext->PSSetShader(myPixelShader, NULL, 0);
+			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+			constBuffer.vOutputCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+			myContext->IASetVertexBuffers(0, 1, &tempBuffer[1], &stride, &offset);
+			myContext->IASetIndexBuffer(metaIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+
+			////Pixel shader
+			//myContext->PSSetShader(myPixelShader, 0, 0);
+			////Vertex Shader					
+			//myContext->VSSetShader(myVertexShader, 0, 0);
+			myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+			myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+			myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+			myContext->DrawIndexed(22242, 0, 0);
+			
+
+
+
+		
+
 
 
 			// Present Backbuffer using Swapchain object

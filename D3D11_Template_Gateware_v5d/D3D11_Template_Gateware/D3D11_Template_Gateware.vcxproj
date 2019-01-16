@@ -115,6 +115,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="FitMetaknight00.h" />
     <ClInclude Include="LetsDrawSomeStuff.h" />
   </ItemGroup>
   <ItemGroup>

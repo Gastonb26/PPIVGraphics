@@ -47,6 +47,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LetsDrawSomeStuff.h" />
+    <ClInclude Include="FitMetaknight00.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Gateware Source">
