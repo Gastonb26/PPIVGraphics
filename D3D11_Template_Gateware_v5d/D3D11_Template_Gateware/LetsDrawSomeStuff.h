@@ -15,6 +15,7 @@
 
 using namespace DirectX;
 
+
 struct myVertex
 {
 	XMFLOAT3 Position;
@@ -56,8 +57,8 @@ class LetsDrawSomeStuff
 	ID3D11PixelShader* myTextureShader = nullptr; 
 
 	ID3D11InputLayout* inputLayout = nullptr; 
+	ID3D11SamplerState* samplerState = nullptr; 
 	D3D_DRIVER_TYPE DDT = D3D_DRIVER_TYPE_NULL; 
-	ID3D11SamplerState* samplerState; 
 
 	XMMATRIX worldMat; 
 	XMMATRIX viewMat;
@@ -66,7 +67,8 @@ class LetsDrawSomeStuff
 	ID3D11Buffer* metaVertexBuffer = nullptr;
 	ID3D11Buffer* metaIndexBuffer = nullptr;
 	ID3D11ShaderResourceView* textureResource; 
-	
+
+	float moveX, moveY, moveZ;
 
 public:
 	// Init
@@ -362,6 +364,52 @@ void LetsDrawSomeStuff::Render()
 					timeStart = timeCur;
 				t = (timeCur - timeStart) / 1000.0f;
 			}
+
+			// MOVE CAMERA
+
+			//XMVECTOR FowardBack = { 0.0f, 0.0f, 1.0f, 0.0f };
+			//XMVECTOR LeftRight = { 1.0f, 0.0f, 0.0f, 0.0f };
+			//if (GetAsyncKeyState('W'))
+			//{
+			//	moveZ += t*15.0f;
+			//}
+			//else if (GetAsyncKeyState('S'))
+			//{
+			//	moveZ -= t*15.0f;
+			//}
+
+			//if (GetAsyncKeyState('D'))
+			//{
+			//	moveX += t*15.0f;
+			//}
+			//else if (GetAsyncKeyState('A'))
+			//{
+			//	moveX -= t*15.0f;
+			//}
+
+
+			//XMVECTOR move = { moveX, 0, moveZ, 1 }; 
+			//XMMATRIX trans = XMMatrixIdentity(); 
+			//trans = XMMatrixTranslation(moveX, moveY, moveZ);
+
+			//XMMATRIX tempView = viewMat; 
+			//XMMATRIX complete = XMMatrixMultiply(trans, tempView);
+			//viewMat = XMMatrixInverse(complete, viewMat);
+			//float aspectR;
+			//mySurface->GetAspectRatio(aspectR);		
+			//moveX = 0; 
+			//moveZ = 0; 
+
+			//matrixFunctions->TranslatelocalF(trans, move, trans);
+			//GMATRIXF tempView = myViewMatrix;			
+			//GMATRIXF complete;
+			//matrixFunctions->MultiplyMatrixF(trans,tempView,complete);
+			////matrixFunctions->InverseF(complete, myViewMatrix);
+			//myViewMatrix = complete; 
+			//float aspectR;
+			//mySurface->GetAspectRatio(aspectR);
+			//matrixFunctions->ProjectionLHF(1.5708f, aspectR, 0.01f, 100.0f, myProjectionMatrix);
+			//camX = 0; 
 
 			// Rotate cube around the origin
 			worldMat = XMMatrixRotationY(t);
