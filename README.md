@@ -6,9 +6,7 @@ Camera Movement Controls
 Yaw and Pitch (look up and sides)
 : Arrows keys 
 
-Camera Zoom 
-T : Zoom out 
-Y : Zoom In
+Camera Zoom : T =  Zoom out || Y =  Zoom In
 
 Camera FOV 
 Z = near plane subtract 
