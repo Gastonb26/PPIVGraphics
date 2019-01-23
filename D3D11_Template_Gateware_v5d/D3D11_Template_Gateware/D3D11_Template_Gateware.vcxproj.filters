@@ -60,5 +60,8 @@
     <FxCompile Include="PS_shader.hlsl" />
     <FxCompile Include="VS_shader.hlsl" />
     <FxCompile Include="PS_texture.hlsl" />
+    <FxCompile Include="PS_sky.hlsl" />
+    <FxCompile Include="VS_sky.hlsl" />
+    <FxCompile Include="PS_point.hlsl" />
   </ItemGroup>
 </Project>

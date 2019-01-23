@@ -22,6 +22,7 @@ struct VS_INPUT
 {
 	float4 Pos : POSITION; 
 	float3 Norm : NORMAL;
+	float4 WorldPosition : POSITION;
 	float2 Tex : TEXCOORD0; 
 };
 
