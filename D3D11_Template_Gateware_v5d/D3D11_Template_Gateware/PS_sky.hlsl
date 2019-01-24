@@ -22,15 +22,15 @@ struct VS_INPUT
 {
 	float4 Pos : POSITION; 
 	float3 Norm : NORMAL;
-	float3 Tex : TEXCOORD0; 
+	float3 Tex : TEXCOORD; 
 };
 
 struct PS_INPUT
 {
 	float4 Pos : SV_POSITION; // system value
 	float3 Norm : NORMAL;
-	float4 WorldPosition : POSITION;
 	float3 Tex : TEXCOORD0; 
+	float4 WorldPosition : POSITION;
 };
 
 

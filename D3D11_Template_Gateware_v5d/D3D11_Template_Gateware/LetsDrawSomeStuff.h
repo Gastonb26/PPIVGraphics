@@ -3,7 +3,6 @@
 // Include our DX11 middle ware
 #include "Gateware Redistribution R5d/Interface/G_Graphics/GDirectX11Surface.h"
 
-
 // Include DirectX11 for interface access
 #include <d3d11.h>
 #include <DirectXMath.h>
@@ -157,7 +156,7 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			};
 
 			UINT numberOfElements = ARRAYSIZE(vLayout); 
@@ -446,6 +445,8 @@ LetsDrawSomeStuff::~LetsDrawSomeStuff()
 	textureResource->Release(); 
 	samplerState->Release();
 
+
+
 	// TODO: "Release()" more stuff here!
 
 	if (mySurface) // Free Gateware Interface
@@ -483,10 +484,10 @@ void LetsDrawSomeStuff::Render()
 			// TODO: Set your shaders, Update & Set your constant buffers, Attatch your vertex & index buffers, Set your InputLayout & Topology & Draw!
 
 			myContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-			//myContext->PSSetShaderResources(0, 1, &textureResource);
-			myContext->PSSetSamplers(0, 1, &samplerState);
 			myContext->IASetInputLayout(inputLayout);
+
+			myContext->PSSetSamplers(0, 1, &samplerState);
+			//myContext->PSSetShaderResources(0, 1, &textureResource);
 
 			UINT stride = sizeof(myVertex);
 			UINT offset = 0;
@@ -510,7 +511,7 @@ void LetsDrawSomeStuff::Render()
 				t = (timeCur - timeStart) / 1000.0f;
 			}
 
-			//Camer Movement
+			//Camera Movement
 			MoveCamera(); 
 
 			// Rotate cube around the origin
@@ -671,7 +672,7 @@ void LetsDrawSomeStuff::Render()
 
 void LetsDrawSomeStuff::MoveCamera()
 {
-
+	//MOVE Forward, Back, Left, Right
 	if (GetAsyncKeyState('W'))
 	{
 		camera.posZ -= camera.speed *.05f;
@@ -707,6 +708,7 @@ void LetsDrawSomeStuff::MoveCamera()
 	    camera.prevPos = camera.currPos;
 		*/
 
+	//Yaw, Pitch and Roll
 	if (GetAsyncKeyState('Q'))
 	{
 		camera.roll -= camera.speed*.005f;
@@ -734,7 +736,7 @@ void LetsDrawSomeStuff::MoveCamera()
 		camera.yaw -= camera.speed*.005f;
 	}
 
-	//////////  LIGHT CONTROLS
+	//////////  Controls for SpotLight
 	if (GetAsyncKeyState('I'))
 	{
 		pointPos.z -= 0.01f;
@@ -813,10 +815,12 @@ void LetsDrawSomeStuff::MoveCamera()
 	//Adjust for infinite skybox
 	skyMat = XMMatrixTranslation(XMVectorGetX(eye), XMVectorGetY(eye), XMVectorGetZ(eye));
 
-	if (nearPlane < 0.01f)
-	{
-		nearPlane = 0.01f;
-	}
+	//if (nearPlane < 0.01f)
+	//{
+	//	nearPlane = 0.01f;
+	//}
+	//float ar  = mySurface->GetAspectRatio(ar);
+
 	projectionMat = XMMatrixPerspectiveFovRH(XMConvertToRadians(65)/camZoom, mySurface->GetAspectRatio(aspectR), nearPlane, farPlane);
 
 	//Ehhhh kinda fucked old code. 
@@ -848,6 +852,8 @@ void LetsDrawSomeStuff::MoveCamera()
 	//viewMat = XMMatrixLookAtLH(eye, at, up);
 	*/
 
+	
+	aspectR = 0; 
 	camera.posX = 0; 
 	camera.posZ = 0;
 	camera.yaw = 0; 

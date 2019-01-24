@@ -29,8 +29,8 @@ struct PS_INPUT
 {
 	float4 Pos : SV_POSITION; // system value
 	float3 Norm : NORMAL;
-	float4 WorldPosition : POSITION;
 	float3 Tex : TEXCOORD0; 
+	float4 WorldPosition : POSITION;
 };
 
 
@@ -42,7 +42,7 @@ PS_INPUT main(VS_INPUT input)
 	output.Pos = mul(output.Pos, Projection);
 	output.Norm = mul(float4(input.Norm, 0), World).xyzw;
 
-	output.Tex = input.Pos;
+	output.Tex = (float3)input.Pos;
 
 	return output;
 }

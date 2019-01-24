@@ -23,15 +23,15 @@ struct VS_INPUT
 {
 	float4 Pos : POSITION; 
 	float3 Norm : NORMAL;
-	float2 Tex : TEXCOORD0; 
+	float3 Tex : TEXCOORD0; 
 };
 
 struct PS_INPUT
 {
 	float4 Pos : SV_POSITION; // system value
 	float3 Norm : NORMAL;
+	float3 Tex : TEXCOORD0; 
 	float4 WorldPosition : POSITION;
-	float2 Tex : TEXCOORD0; 
 };
 
 
@@ -44,5 +44,7 @@ float4 PS(PS_INPUT input) : SV_Target
 
 	float attenuation = 1.0f - saturate(length(lightPos - input.WorldPosition) / 9.99f);
 
-	return saturate(lightRatio * vOutputCol  * (attenuation*attenuation));
+	return saturate(lightRatio *  vOutputCol  * (attenuation*attenuation));
 }
+
+//return saturate(lightRatio *  vOutputCol * txDiffuse.Sample(samLinear, input.Tex)  * (attenuation*attenuation));
