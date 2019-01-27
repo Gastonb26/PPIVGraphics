@@ -13,6 +13,7 @@
 #include "VS_shader.csh"
 #include "PS_texture.csh"
 #include "PS_point.csh"
+//#include "PS_emissive"
 
 #include "PS_sky.csh"
 #include "VS_sky.csh"
@@ -21,69 +22,53 @@
 
 using namespace DirectX;
 
-struct myVertex
-{
-	XMFLOAT3 Position;
-	XMFLOAT3 Normal;
-	XMFLOAT2 Tex;
-};
-
-struct ConstantBuffer
-{
-	XMMATRIX mWorld;
-	XMMATRIX mView;
-	XMMATRIX mProjection;
-	XMFLOAT4 vLightDir[2];
-	XMFLOAT4 vLightCol[2];
-	XMFLOAT4 vOutputCol;
-	XMFLOAT3 pointLight; 
-};
-
-struct CamInfo
-{
-	/*
-	XMVECTOR DefaultForward = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-	XMVECTOR DefaultRight = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
-	XMVECTOR camForward = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-	XMVECTOR camRight = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
-
-	XMMATRIX camRotationMatrix;
-	XMMATRIX groundWorld;
-
-	float moveLeftRight = 0.0f;
-	float moveBackForward = 0.0f;
-
-	float camYaw = 0.0f;
-	float camPitch = 0.0f;
-
-	POINT currPos = { 0 };
-	POINT prevPos = { 0 };
-	*/
-	float posX, posY, posZ; 
-	float yaw, pitch, roll; 
-	float speed = .5f; 
-	
-} camera; 
-
-XMVECTOR eye;
-XMVECTOR at;
-XMVECTOR up;
-float aspectR;
-float nearPlane = 0.02f; 
-float farPlane = 200.0f; 
-
-float camZoom = 1.0f; 
-
-static float t;
-
-XMMATRIX skyMat = XMMatrixTranslation(0.0f, 0.0f, 5.0f);
-XMFLOAT3 pointPos = XMFLOAT3 (0.0f, 0.0f, -5.0f); 
-
 // Simple Container class to make life easier/cleaner
 class LetsDrawSomeStuff
 {
+	struct myVertex
+	{
+		XMFLOAT3 Position;
+		XMFLOAT3 Normal;
+		XMFLOAT2 Tex;
+	};
+
+	struct ConstantBuffer
+	{
+		XMMATRIX mWorld;
+		XMMATRIX mView;
+		XMMATRIX mProjection;
+		XMFLOAT4 vLightDir[2];
+		XMFLOAT4 vLightCol[2];
+		XMFLOAT4 vOutputCol;
+		XMFLOAT3 pointLight;
+		float pad;
+		XMFLOAT3 spotLight;
+	};
+
+	struct CamInfo
+	{
+		XMVECTOR eye;
+		XMVECTOR at;
+		XMVECTOR up;
+		float posX, posY, posZ;
+		float yaw, pitch, roll;
+		float speed = 0.5f;
+		float nearPlane = 0.02f;
+		float farPlane = 200.0f;
+		float camZoom = 1.0f;
+		int lightControl = 1;
+
+	} camera;
+
+	//Might need these for later
+	float aspectR;
+	unsigned int height = 0;
+	unsigned int width = 0;
+
 	// variables here
 	GW::GRAPHICS::GDirectX11Surface* mySurface = nullptr;
+	GW::SYSTEM::GWindow *resize = nullptr;	// attach point? Might need this for adjusting aspect ratio! 
+
 	// Gettting these handles from GDirectX11Surface will increase their internal refrence counts, be sure to "Release()" them when done!
 	ID3D11Device *myDevice = nullptr;
 	IDXGISwapChain *mySwapChain = nullptr;
@@ -99,6 +84,7 @@ class LetsDrawSomeStuff
 	ID3D11PixelShader* myTextureShader = nullptr; 
 	ID3D11PixelShader* mySkyPshader = nullptr; 
 	ID3D11PixelShader* myPointShader = nullptr; 
+	ID3D11PixelShader* myEmissiveShader = nullptr; 
 
 	ID3D11InputLayout* inputLayout = nullptr; 
 	ID3D11SamplerState* samplerState = nullptr; 
@@ -108,11 +94,18 @@ class LetsDrawSomeStuff
 	XMMATRIX worldMat; 
 	XMMATRIX viewMat;
 	XMMATRIX projectionMat;
- 
+	//SkyBox
+	XMMATRIX skyMat = XMMatrixTranslation(0.0f, 0.0f, 5.0f);
+	//Models (for lights and objects)
+	XMMATRIX spotMat = XMMatrixTranslation(5.0f, 0.0f, 0.0f);
 	XMMATRIX metaMat = XMMatrixTranslation(0.0f, 4.0f, 0.0f); 
 
+	// Light Positions
+	XMFLOAT3 pointPos = XMFLOAT3(0.0f, 0.0f, -5.0f);
+	XMFLOAT3 spotPos = XMFLOAT3(5.0f, 0.0f, 0.0f);
+
 	// BUFFERS
-	ID3D11Buffer* constantBuffer = nullptr; // lights
+	ID3D11Buffer* constantBuffer = nullptr; 
 	
 	ID3D11Buffer* vertexBuffer = nullptr; // cube
 	ID3D11Buffer* indexBuffer = nullptr; // cube
@@ -126,6 +119,16 @@ class LetsDrawSomeStuff
 	//TEXTURES
 	ID3D11ShaderResourceView* textureResource = nullptr; 
 	ID3D11ShaderResourceView* skyResource = nullptr; 
+	//ID3D11ShaderResourceView* emissiveTex = nullptr; 
+
+
+
+
+
+
+
+
+
 
 public:
 	// Init
@@ -150,6 +153,14 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			mySurface->GetDevice((void**)&myDevice);
 			mySurface->GetSwapchain((void**)&mySwapChain);
 			mySurface->GetContext((void**)&myContext);
+			
+
+			//USE T
+			resize = attatchPoint; 
+			resize->GetClientHeight(height); 
+			resize->GetClientWidth(width); 
+			aspectR = (float)width / (float)height;
+
 
 			// TODO: Create new DirectX stuff here! (Buffers, Shaders, Layouts, Views, Textures, etc...)
 			D3D11_INPUT_ELEMENT_DESC vLayout[] =
@@ -162,7 +173,12 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			UINT numberOfElements = ARRAYSIZE(vLayout); 
 			myDevice->CreateInputLayout(vLayout, numberOfElements, VS_shader, sizeof(VS_shader), &inputLayout);
 
-			////////////////////////// SECTION 1 : BASIC CUBE SETUP ///////////////////////////////////////////
+
+			//////////////////////////////////////////////////////////////////////////////////////////////
+			///////////////////////////////////SECTION : MODELS //////////////////////////////////////////
+			//////////////////////////////////////////////////////////////////////////////////////////////
+			
+			////////////////////////// CUBE FOR CAMERAS //////////////////////////////////////////////
 			myVertex tri[]
 			{ //xyzq, rgba, uv 
 				{ XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
@@ -238,9 +254,8 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 
 			myDevice->CreateBuffer(&bDesc, &subData, &indexBuffer);
 
-			///////////////////////////// SECTION 1: END /////////////////////////////////////////////
 
-			///////////////////////////// SECTION 2: SKYBOX //////////////////////////////////////////
+			///////////////////////////// SKYBOX //////////////////////////////////////////
 
 			myVertex SKYBOX[]
 			{ //xyzq, rgba, uv 
@@ -315,9 +330,8 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 
 			myDevice->CreateBuffer(&bDesc, &subData, &skyIndexBuffer);
 
-			///////////////////////// SECTION 2: SKYBOX END /////////////////////////////////////
 								
-			///////////////////////// SECTION 3: MODELS (meta,etc.)//////////////////////////////
+			///////////////////////// META //////////////////////////////
 
 			myVertex* tempMeta = new myVertex[5979]; 
 			for (int i = 0; i < 5979; i++)
@@ -405,14 +419,14 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			worldMat = XMMatrixIdentity();
 
 			//init View Matrix
-			eye = XMVectorSet(0.0f, -4.0f, -20.0f, 0.0f);
-			at = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-			up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-			viewMat = XMMatrixLookAtLH(eye, at, up);
+			camera.eye = XMVectorSet(0.0f, 5.0f, -30.0f, 0.0f);
+			camera.at = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+			camera.up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+			viewMat = XMMatrixLookAtRH(camera.eye, camera.at, camera.up);
 
 			//init Projection Matrix
 			
-			projectionMat = XMMatrixPerspectiveFovRH(XMConvertToRadians(65)/camZoom, mySurface->GetAspectRatio(aspectR), nearPlane, farPlane);
+			projectionMat = XMMatrixPerspectiveFovRH(XMConvertToRadians(65)/camera.camZoom, mySurface->GetAspectRatio(aspectR), camera.nearPlane, camera.farPlane);
 		}
 	}
 }
@@ -473,6 +487,40 @@ void LetsDrawSomeStuff::Render()
 				myDepthStencilView->Release();
 			}
 
+			/*if (mySwapChain)
+			//{
+			//	resize->GetClientHeight(height);
+			//	resize->GetClientWidth(width);
+			//	aspectR = (float)width / (float)height;
+			//	resize->ResizeWindow(height, width);
+			//	resize.
+				//myContext->OMSetRenderTargets(0, 0, 0);
+				//myRenderTargetView->Release();
+				//mySwapChain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
+
+				//ID3D11Texture2D* pBuffer;
+				//mySwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&pBuffer);
+
+				//myDevice->CreateRenderTargetView(pBuffer, NULL, &myRenderTargetView);
+
+				//pBuffer->Release();
+
+				//myContext->OMSetRenderTargets(1, &myRenderTargetView, NULL);
+
+				//D3D11_VIEWPORT re;
+				//resize->GetClientWidth(width);
+				//resize->GetClientHeight(height);
+				//re.Width = (float)width;
+				//re.Height = (float)height;
+				//re.MinDepth = 0.0f;
+				//re.MaxDepth = 1.0f;
+				//re.TopLeftX = 0;
+				//re.TopLeftY = 0;
+				//myContext->RSSetViewports(1, &re);
+
+				//resize->ResizeWindow
+			//}*/
+			
 			// Set active target for drawing, all array based D3D11 functions should use a syntax similar to below
 			ID3D11RenderTargetView* const targets[] = { myRenderTargetView };
 			myContext->OMSetRenderTargets(1, targets, myDepthStencilView);
@@ -497,7 +545,7 @@ void LetsDrawSomeStuff::Render()
 
 			////////////////////////////////////LIGHTS////////////////////////////////////
 			// you originally declared T here (look into using xTIME instead) 
-			t = +(float)XM_PI * 0.0125f;
+			static float t = +(float)XM_PI * 0.0125f;
 			if (DDT == D3D_DRIVER_TYPE_REFERENCE)
 			{
 				t += (float)XM_PI * 0.0125f;
@@ -575,27 +623,31 @@ void LetsDrawSomeStuff::Render()
 				myContext->DrawIndexed(36, 0, 0);
 			}
 
-			//////////////////////////CREATE MODELS///////////////////////////////////////
+			//////////////////////////////////////////////////////////////////////////////////////////////
+			///////////////////////////////////SECTION 2: MODELS//////////////////////////////////////////
+			//////////////////////////////////////////////////////////////////////////////////////////////
 			XMMATRIX scale;
 			XMMATRIX trans; 
 		
-			/////////////////MODEL : FLoor 
-			scale = XMMatrixScaling(10.0f, 0.05f, 10.0f);
+			constBuffer.pointLight = pointPos; 
+			constBuffer.spotLight = spotPos; 
+			constBuffer.vOutputCol = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+			
+			/////////////////MODEL : FLoor
+			myContext->PSSetShaderResources(0, 1, &textureResource);
+
+			scale = XMMatrixScaling(30.0f, 0.05f, 30.0f);
 			trans = XMMatrixTranslation(0.0f, -5.0f, 0.0f); 
 			
-			constBuffer.pointLight = pointPos; 
-
-			XMMATRIX pPos = XMMatrixTranslation(0.0f, 0.0f, -5.0f); 
 			
 			constBuffer.mWorld = XMMatrixTranspose(worldMat * scale * trans);
 			constBuffer.mView = XMMatrixTranspose(viewMat);
 			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
 
-			constBuffer.vOutputCol = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
 			myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
 			myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
 
-			//Vertex shader
+			//Vertex shader 
 			myContext->PSSetShader(myPointShader, 0, 0);
 			//Pixel Shader					
 			myContext->VSSetShader(myVertexShader, 0, 0);
@@ -606,16 +658,38 @@ void LetsDrawSomeStuff::Render()
 			myContext->DrawIndexed(36, 0, 0);
 			//STOP THE COPY PASTE.
 
+			////////////////////////////MODEL : SPOT CAM BOX
 
-			/////////////////MODEL : META
+			scale = XMMatrixScaling(1.0f, 1.0f, 1.0f);
+			constBuffer.vOutputCol = XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f);
+
+			constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * spotMat);
+			constBuffer.mView = XMMatrixTranspose(viewMat);
+			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+
+			myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
+			myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
+
+			//Vertex shader
+			myContext->PSSetShaderResources(0, 1, &textureResource);
+			myContext->PSSetShader(myTextureShader, 0, 0);
+			//Pixel Shader					
+			myContext->VSSetShader(myVertexShader, 0, 0);
+			myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+			myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+			myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+			myContext->DrawIndexed(36, 0, 0);
+
+			//////////////////////////////MODEL : META
 			
 			myContext->PSSetShaderResources(0, 1, &textureResource);
 
 			scale = XMMatrixScaling(1/5.0f, 1 / 5.0f, 1 / 5.0f); 
 			constBuffer.mWorld = XMMatrixTranspose(worldMat * scale * metaMat);
 			constBuffer.mView = XMMatrixTranspose(viewMat);
-			myContext->PSSetShader(myTextureShader, 0, 0);
 			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+			myContext->PSSetShader(myTextureShader, 0, 0);
 			//constBuffer.vOutputCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 			myContext->IASetVertexBuffers(0, 1, &tempBuffer[1], &stride, &offset);
 			myContext->IASetIndexBuffer(metaIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
@@ -629,13 +703,16 @@ void LetsDrawSomeStuff::Render()
 
 			myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
 			myContext->DrawIndexed(22242, 0, 0);
-			////////////////////////// END MODELs///////////////////////////////////////
 
-			/////////////////////////////SKYBOX ///////////////////////////////
+
+			//////////////////////////////////////////////////////////////////////////////////////////////
+			///////////////////////////////////SECTION 3: SKYBOX /////////////////////////////////////////
+			//////////////////////////////////////////////////////////////////////////////////////////////
+
 			//Object data
 			myContext->PSSetShaderResources(0, 1, &skyResource);
 			
-			scale = XMMatrixScaling(50.0f, 50.0f, 50.0f); 
+			scale = XMMatrixScaling(100.0f, 100.0f, 100.0f); 
 			constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * skyMat);
 			constBuffer.mView = XMMatrixTranspose(viewMat);
 			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
@@ -651,64 +728,59 @@ void LetsDrawSomeStuff::Render()
 			myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
 			myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
 			myContext->DrawIndexed(36, 0, 0);
-			///////////////////////////// END SKYBOX /////////////////////////////////////////
+
+			//////////////////////////////////////////////////////////////////////////////////////////////
+			///////////////////////////////////SECTION 4: SwapChain & more ///////////////////////////////
+			//////////////////////////////////////////////////////////////////////////////////////////////
+
 
 	
 			////////////////////////////// UPDATE CAMERA //////////////////////////////////// 
 			constBuffer.mView = XMMatrixTranspose(viewMat); 
 			myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
 			////////////////////////////// END UPDATE ///////////////////////////////////////
-
+		
 
 			// Present Backbuffer using Swapchain object
 			// Framerate is currently unlocked, we suggest "MSI Afterburner" to track your current FPS and memory usage.
 			mySwapChain->Present(0, 0); // set first argument to 1 to enable vertical refresh sync with display
-
+			
 			// Free any temp DX handles aquired this frame
 			myRenderTargetView->Release();
+
+			//mySwapChain->ResizeBuffers(0,0,0, XGI_FORMAT_UNKNOWN, 0)
 		}
 	}
 }
 
 void LetsDrawSomeStuff::MoveCamera()
 {
+
+	//Increase Movement Speed 
+	if (GetAsyncKeyState(VK_SHIFT))
+	{
+		camera.speed = 1.5f; 
+	}
+
 	//MOVE Forward, Back, Left, Right
 	if (GetAsyncKeyState('W'))
 	{
 		camera.posZ -= camera.speed *.05f;
-		//camera.moveBackForward += camera.speed;
 	}
 	else if (GetAsyncKeyState('S'))
 	{
 		camera.posZ += camera.speed*.05f;
-		//camera.moveBackForward -= camera.speed; 
 	}
 	if (GetAsyncKeyState('D'))
 	{
 		camera.posX -= camera.speed *.05f;
-		//camera.moveLeftRight += camera.speed; 
 	}
 	else if (GetAsyncKeyState('A'))
 	{
 		camera.posX += camera.speed*.05f;
-		//camera.moveLeftRight -= camera.speed; 
 	}
 
-	//using right click to aim.... Not working right now. 
-	/*
-	if (GetAsyncKeyState(VK_RBUTTON))
-	{
-		//float pX = float(camera.currPos.x - camera.prevPos.x);
-		//float pY =   float(camera.currPos.y - camera.prevPos.y);
-
-		//camera.camYaw += pX * 0.001f; 
-		//camera.camPitch += pY * 0.001f; 
-
-	}
-	    camera.prevPos = camera.currPos;
-		*/
-
-	//Yaw, Pitch and Roll
+	//Roll, Pitch, Yaw
 	if (GetAsyncKeyState('Q'))
 	{
 		camera.roll -= camera.speed*.005f;
@@ -736,63 +808,139 @@ void LetsDrawSomeStuff::MoveCamera()
 		camera.yaw -= camera.speed*.005f;
 	}
 
-	//////////  Controls for SpotLight
+	//////////  Controls for Lights ( 1: Point, 2: Spot, etc.)
+	if (GetAsyncKeyState('1'))
+	{
+		camera.lightControl = 1; 
+	}
+	if (GetAsyncKeyState('2'))
+	{
+		camera.lightControl = 2; 
+	}
+
 	if (GetAsyncKeyState('I'))
 	{
-		pointPos.z -= 0.01f;
+		switch (camera.lightControl)
+		{
+		case 1: 
+			pointPos.z -= 0.05f * camera.speed;
+			break; 
+		case 2: 
+			spotPos.z -= 0.05f  * camera.speed;
+			spotMat *= XMMatrixTranslation(0.0f, 0.0f, -0.05f * camera.speed);
+			break; 
+		default:
+			break;
+		}	
 	}
 	else if (GetAsyncKeyState('K'))
 	{
-		pointPos.z += 0.01f;
+		switch (camera.lightControl)
+		{
+		case 1:
+			pointPos.z += 0.05f* camera.speed;
+			break;
+		case 2:
+			spotPos.z += 0.05f * camera.speed;
+			spotMat *= XMMatrixTranslation(0.0f, 0.0f, 0.05f *camera.speed);
+			break;
+		default:
+			break;
+		}
 	}
 	if (GetAsyncKeyState('J'))
 	{
-		pointPos.x += 0.01f;
+		switch (camera.lightControl)
+		{
+		case 1:
+			pointPos.x += 0.05f* camera.speed;
+			break;
+		case 2:
+			spotPos.x += 0.05f * camera.speed;
+			spotMat *= XMMatrixTranslation(0.05f * camera.speed, 0.0f, 0.0f);
+			break;
+		default:
+			break;
+		}
 	}
 	else if (GetAsyncKeyState('L'))
 	{
-		pointPos.x -= 0.01f;
+		switch (camera.lightControl)
+		{
+		case 1:
+			pointPos.x -= 0.05f * camera.speed;
+			break;
+		case 2:
+			spotPos.x -= 0.05f  * camera.speed;
+			spotMat *= XMMatrixTranslation(-0.05f * camera.speed, 0.0f, 0.0f);
+			break;
+		default:
+			break;
+		}
 	}
-
 	if (GetAsyncKeyState('U'))
 	{
-		pointPos.y += 0.01f;
+		switch (camera.lightControl)
+		{
+		case 1:
+			pointPos.y += 0.05f * camera.speed;
+			break;
+		case 2:
+			spotPos.y += 0.05f  * camera.speed;
+			spotMat *= XMMatrixTranslation(0.0f, 0.05f * camera.speed, 0.0f);
+			break;
+		default:
+			break;
+		}
 	}
 	else if (GetAsyncKeyState('O'))
 	{
-		pointPos.y -= 0.01f;
+		switch (camera.lightControl)
+		{
+		case 1:
+			pointPos.y -= 0.05f * camera.speed;
+			break;
+		case 2:
+			spotPos.y -= 0.05f  * camera.speed;
+			spotMat *= XMMatrixTranslation(0.0f, -0.05f * camera.speed, 0.0f);
+			break;
+		default:
+			break;
+		}
 	}
 
+	// Near/Far Plane and Zoom adjustments
 	if (GetAsyncKeyState('Z'))
 	{
-		nearPlane -= 0.1f; 
-		if (nearPlane < 0.01f)
+		camera.nearPlane -= 0.1f; 
+		if (camera.nearPlane < 0.01f)
 		{
-			nearPlane = 0.01f;
+			camera.nearPlane = 0.01f;
 		}
 	}
 	else if (GetAsyncKeyState('X'))
 	{
-		nearPlane += 0.1f;
+		camera.nearPlane += 0.1f;
 	}
 	if (GetAsyncKeyState('N'))
 	{
-		farPlane -=  0.1f;
+		camera.farPlane -=  0.1f;
 	}
 	else if (GetAsyncKeyState('M'))
 	{
-		farPlane += 0.1f; 
+		camera.farPlane += 0.1f; 
 	}
 
 	if (GetAsyncKeyState('T'))
 	{
-		camZoom -= 0.001f; 
+		camera.camZoom -= 0.001f; 
 	}
 	else if (GetAsyncKeyState('Y'))
 	{
-		camZoom += 0.001f;
+		camera.camZoom += 0.001f;
 	}
 
+	// Update Camera
 	viewMat = XMMatrixInverse(nullptr, viewMat);
 	viewMat = XMMatrixTranslationFromVector(XMVECTOR{ 0,0, camera.posZ})*viewMat;
 	viewMat = XMMatrixTranslationFromVector(XMVECTOR{ camera.posX,0,0 })*viewMat;
@@ -806,59 +954,23 @@ void LetsDrawSomeStuff::MoveCamera()
 	viewMat = viewMat * XMMatrixRotationY(camera.yaw);
 	viewMat.r[3] = tmp;
 
-	eye = viewMat.r[3];
-	at = viewMat.r[2];
-	up = viewMat.r[1];
+	camera.eye = viewMat.r[3];
+	camera.at = viewMat.r[2];
+	camera.up = viewMat.r[1];
 
 	viewMat = XMMatrixInverse(0, viewMat);
 
 	//Adjust for infinite skybox
-	skyMat = XMMatrixTranslation(XMVectorGetX(eye), XMVectorGetY(eye), XMVectorGetZ(eye));
+	skyMat = XMMatrixTranslation(XMVectorGetX(camera.eye), XMVectorGetY(camera.eye), XMVectorGetZ(camera.eye));
 
-	//if (nearPlane < 0.01f)
-	//{
-	//	nearPlane = 0.01f;
-	//}
-	//float ar  = mySurface->GetAspectRatio(ar);
+	projectionMat = XMMatrixPerspectiveFovRH(XMConvertToRadians(65)/camera.camZoom, mySurface->GetAspectRatio(aspectR), camera.nearPlane, camera.farPlane);
 
-	projectionMat = XMMatrixPerspectiveFovRH(XMConvertToRadians(65)/camZoom, mySurface->GetAspectRatio(aspectR), nearPlane, farPlane);
-
-	//Ehhhh kinda fucked old code. 
-	/*
-	//camera.camRotationMatrix = XMMatrixRotationRollPitchYaw(camera.camPitch, camera.camYaw, 0);
-	//at = XMVector3TransformCoord(camera.DefaultForward, camera.camRotationMatrix);
-	//at = XMVector3Normalize(at);
-
-	////XMMATRIX RotateYTempMatrix;
-	////RotateYTempMatrix = XMMatrixRotationY(camera.camYaw);
-
-	////camera.camRight = XMVector3TransformCoord(camera.DefaultRight, RotateYTempMatrix);
-	////up = XMVector3TransformCoord(up, RotateYTempMatrix);
-	////camera.camForward = XMVector3TransformCoord(camera.DefaultForward, RotateYTempMatrix);
-
-	//camera.camRight = XMVector3TransformCoord(camera.DefaultRight, camera.camRotationMatrix);
-	//camera.camForward = XMVector3TransformCoord(camera.DefaultForward, camera.camRotationMatrix);
-	//up = XMVector3Cross(camera.camForward, camera.camRight);
-
-
-	//eye += camera.moveLeftRight*camera.camRight;
-	//eye += camera.moveBackForward*camera.camForward;
-
-	//camera.moveLeftRight = 0.0f;
-	//camera.moveBackForward = 0.0f;
-
-	//at = eye + at;
-
-	//viewMat = XMMatrixLookAtLH(eye, at, up);
-	*/
-
-	
-	aspectR = 0; 
+	//aspectR = 0; 
 	camera.posX = 0; 
 	camera.posZ = 0;
 	camera.yaw = 0; 
 	camera.roll = 0; 
 	camera.yaw = 0; 
 	camera.pitch = 0; 
-
+	camera.speed = 0.5f; 
 }

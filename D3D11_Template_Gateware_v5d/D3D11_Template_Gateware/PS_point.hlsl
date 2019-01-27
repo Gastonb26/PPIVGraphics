@@ -17,6 +17,8 @@ cbuffer ConstantBuffer : register (b0)
 	float4 vLightColor[2];
 	float4 vOutputCol;
 	float3 lightPos; 
+	float pad; 
+	float3 spotPos; 
 }
 
 struct VS_INPUT
@@ -37,14 +39,35 @@ struct PS_INPUT
 
 float4 PS(PS_INPUT input) : SV_Target
 {
+	//Both lights Use
+	float3 lightDir = normalize(spotPos - input.WorldPosition);
+	
+	//SpotLight  //TODO change voutPutColor to point Color and add Spot Color to constant buffer? 
+	float4 spotColor = float4 (1.0f, 1.0f, 1.0f, 1.0f);
+	
+	float lightRat = saturate(dot(lightDir, input.Norm));
+	float3 coneDir = normalize(float3(0.0f,-2.0f, -10.0f));
+
 	input.Norm = normalize(input.Norm);
-	float3 lightDir = normalize(lightPos - input.WorldPosition);
-
-	float lightRatio = saturate(dot(lightDir, input.Norm));
-
+	float surfaceRat = saturate(dot(-lightDir, coneDir));
+	float spotFac = (surfaceRat > .90f) ? 1 : 0;
+	float spotAtt = 1.0f - saturate((0.96f - surfaceRat) / (0.96f - .90f));
+	float4 spotFinal = 100*(spotFac * lightRat * spotColor * txDiffuse.Sample(samLinear, input.Tex) * (spotAtt*spotAtt));
+	
+	//PointLight
+	lightDir = normalize(lightPos - input.WorldPosition);
+	float lightRatio = saturate(dot(lightDir, input.Norm));	
 	float attenuation = 1.0f - saturate(length(lightPos - input.WorldPosition) / 9.99f);
+	float4 pointFinal = 10*(saturate(lightRatio *  vOutputCol  * txDiffuse.Sample(samLinear, input.Tex) *(attenuation*attenuation)));
 
-	return saturate(lightRatio *  vOutputCol  * (attenuation*attenuation));
+	return spotFinal + pointFinal; 
+
+	//SpotLight 
+	//SURFACERATIO = CLAMP(DOT(-LIGHTDIR, CONEDIR))
+	//SPOTFACTOR = (SURFACERATIO > CONERATIO) ? 1 : 0
+	//LIGHTRATIO = CLAMP(DOT(LIGHTDIR, SURFACENORMAL))
+	//RESULT = SPOTFACTOR * LIGHTRATIO * LIGHTCOLOR * SURFACECOLOR
+	//ATTENUATION = 1.0 – CLAMP((INNERCONERATIO - SURFACERATIO) / (INNERCONERATIO – OUTERCONERATIO))
+
 }
 
-//return saturate(lightRatio *  vOutputCol * txDiffuse.Sample(samLinear, input.Tex)  * (attenuation*attenuation));
