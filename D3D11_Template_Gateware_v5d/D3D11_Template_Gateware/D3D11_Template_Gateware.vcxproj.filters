@@ -50,6 +50,14 @@
     <ClInclude Include="LetsDrawSomeStuff.h" />
     <ClInclude Include="FitMetaknight00.h" />
     <ClInclude Include="DDSTextureLoader.h" />
+    <ClInclude Include="holyGrail.h" />
+    <ClInclude Include="holyhand.h" />
+    <ClInclude Include="Knight.h" />
+    <ClInclude Include="Rabbit.h" />
+    <ClInclude Include="grail.h" />
+    <ClInclude Include="HHG3D.h" />
+    <ClInclude Include="cloud.h" />
+    <ClInclude Include="sephiroth.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Gateware Source">
@@ -63,5 +71,6 @@
     <FxCompile Include="PS_sky.hlsl" />
     <FxCompile Include="VS_sky.hlsl" />
     <FxCompile Include="PS_point.hlsl" />
+    <FxCompile Include="PS_grayscale.hlsl" />
   </ItemGroup>
 </Project>

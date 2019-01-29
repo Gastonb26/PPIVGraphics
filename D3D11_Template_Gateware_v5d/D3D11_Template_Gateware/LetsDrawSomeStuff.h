@@ -6,19 +6,29 @@
 // Include DirectX11 for interface access
 #include <d3d11.h>
 #include <DirectXMath.h>
+#include <DirectXColors.h>
 
 #include "DDSTextureLoader.h"
 
 #include "PS_shader.csh"
 #include "VS_shader.csh"
+
 #include "PS_texture.csh"
 #include "PS_point.csh"
-//#include "PS_emissive"
 
 #include "PS_sky.csh"
 #include "VS_sky.csh"
 
 #include "FitMetaknight00.h"
+#include "holyhand.h"
+#include "Rabbit.h"
+#include "Grail.h"
+#include "holyGrail.h"
+#include "Knight.h"
+#include "HHG3D.h"
+#include "cloud.h"
+#include "sephiroth.h"
+
 
 using namespace DirectX;
 
@@ -41,8 +51,10 @@ class LetsDrawSomeStuff
 		XMFLOAT4 vLightCol[2];
 		XMFLOAT4 vOutputCol;
 		XMFLOAT3 pointLight;
-		float pad;
+		float pointIntensity; // padding too 
 		XMFLOAT3 spotLight;
+		float spotIntensity; 
+		XMFLOAT4 spotCol; 
 	};
 
 	struct CamInfo
@@ -60,14 +72,17 @@ class LetsDrawSomeStuff
 
 	} camera;
 
-	//Might need these for later
+	//Might need these for later (Resizing Window, aspect Ratio adjustment and more);
 	float aspectR;
 	unsigned int height = 0;
 	unsigned int width = 0;
+	//Render Scenes
+	int scene = 1; 
+	bool cubesOn = false; 
 
 	// variables here
 	GW::GRAPHICS::GDirectX11Surface* mySurface = nullptr;
-	GW::SYSTEM::GWindow *resize = nullptr;	// attach point? Might need this for adjusting aspect ratio! 
+	GW::SYSTEM::GWindow *attPoint = nullptr;	// attach point? Might need this for adjusting aspect ratio! 
 
 	// Gettting these handles from GDirectX11Surface will increase their internal refrence counts, be sure to "Release()" them when done!
 	ID3D11Device *myDevice = nullptr;
@@ -77,58 +92,93 @@ class LetsDrawSomeStuff
 	// TODO: Add your own D3D11 variables here (be sure to "Release()" them when done!)
 
 	// SHADERS
-	ID3D11VertexShader* myVertexShader = nullptr; 
-	ID3D11VertexShader* mySkyVshader = nullptr; 
+	ID3D11VertexShader *myVertexShader = nullptr; 
+	ID3D11VertexShader *mySkyVshader = nullptr; 
 
-	ID3D11PixelShader* myPixelShader = nullptr; 
-	ID3D11PixelShader* myTextureShader = nullptr; 
-	ID3D11PixelShader* mySkyPshader = nullptr; 
-	ID3D11PixelShader* myPointShader = nullptr; 
-	ID3D11PixelShader* myEmissiveShader = nullptr; 
+	ID3D11PixelShader *myPixelShader = nullptr; 
+	ID3D11PixelShader *myTextureShader = nullptr; 
+	ID3D11PixelShader *mySkyPshader = nullptr; 
+	ID3D11PixelShader *myPointShader = nullptr; 
+	//ID3D11PixelShader *myEmissiveShader = nullptr; 
 
-	ID3D11InputLayout* inputLayout = nullptr; 
-	ID3D11SamplerState* samplerState = nullptr; 
-	D3D_DRIVER_TYPE DDT = D3D_DRIVER_TYPE_NULL; 
+	// BUFFERS
+	ID3D11Buffer *constantBuffer = nullptr; 
+				 
+	ID3D11Buffer *vertexBuffer = nullptr; // cube
+	ID3D11Buffer *indexBuffer = nullptr; // cube
+				 
+	ID3D11Buffer *skyVertexBuffer = nullptr; 
+	ID3D11Buffer *skyIndexBuffer = nullptr; 
+				 
+	ID3D11Buffer *knightVB = nullptr; 
+	ID3D11Buffer *knightIB = nullptr; 
 
+	ID3D11Buffer *rabbitVB = nullptr; 
+	ID3D11Buffer *rabbitIB = nullptr; 
+
+	ID3D11Buffer *holyhandVB = nullptr; 
+	ID3D11Buffer *holyhandIB = nullptr; 
+
+	ID3D11Buffer *grailVB = nullptr; 
+	ID3D11Buffer *grailIB = nullptr; 
+
+	ID3D11Buffer *metaVB = nullptr;
+	ID3D11Buffer *metaIB = nullptr;
+
+	ID3D11Buffer *cloudVB = nullptr; 
+	ID3D11Buffer *cloudIB = nullptr;
+
+	ID3D11Buffer *sephirothVB = nullptr; 
+	ID3D11Buffer *sephirothIB = nullptr; 
+	
 	// MATRICES
 	XMMATRIX worldMat; 
 	XMMATRIX viewMat;
 	XMMATRIX projectionMat;
-	//SkyBox
-	XMMATRIX skyMat = XMMatrixTranslation(0.0f, 0.0f, 5.0f);
-	//Models (for lights and objects)
-	XMMATRIX spotMat = XMMatrixTranslation(5.0f, 0.0f, 0.0f);
-	XMMATRIX metaMat = XMMatrixTranslation(0.0f, 4.0f, 0.0f); 
 
-	// Light Positions
+	XMMATRIX scale;
+	XMMATRIX trans;
+	XMMATRIX rot;
+	
+	XMMATRIX skyMat = XMMatrixTranslation(0.0f, 10.0f, 5.0f);
+	XMMATRIX spotMat = XMMatrixTranslation(5.0f, 0.0f, 0.0f);
+	XMMATRIX pointMat = XMMatrixTranslation(0.0f, 0.0f, -5.0f); 
+	XMMATRIX grailMat = XMMatrixIdentity(); 
+
+	XMMATRIX metaMat = XMMatrixTranslation(0.0f, 4.0f, 0.0f); 
+	
+	// RENDER TO TEXTURE CUBE
+	XMMATRIX renderCube = XMMatrixTranslation(0.0f, 0.0f, 25.0f);
+	XMMATRIX renderCubeIn = XMMatrixTranslation(.0f, 0.0f, 30.0f);
+		
+	// POSTIONS
 	XMFLOAT3 pointPos = XMFLOAT3(0.0f, 0.0f, -5.0f);
 	XMFLOAT3 spotPos = XMFLOAT3(5.0f, 0.0f, 0.0f);
 
-	// BUFFERS
-	ID3D11Buffer* constantBuffer = nullptr; 
-	
-	ID3D11Buffer* vertexBuffer = nullptr; // cube
-	ID3D11Buffer* indexBuffer = nullptr; // cube
+	// TEXTURES
+	ID3D11ShaderResourceView *textureResource = nullptr; //simple fake looking metal (used for meta knight
+	ID3D11ShaderResourceView *knightTex = nullptr; 
+	ID3D11ShaderResourceView *rabbitTex = nullptr; 
+	ID3D11ShaderResourceView *goldTex = nullptr; 
 
-	ID3D11Buffer* skyVertexBuffer = nullptr; 
-	ID3D11Buffer* skyIndexBuffer = nullptr; 
-
-	ID3D11Buffer* metaVertexBuffer = nullptr;
-	ID3D11Buffer* metaIndexBuffer = nullptr;
-
-	//TEXTURES
-	ID3D11ShaderResourceView* textureResource = nullptr; 
-	ID3D11ShaderResourceView* skyResource = nullptr; 
+	ID3D11ShaderResourceView *skyResource = nullptr; 
+	ID3D11ShaderResourceView *skyCastleResource = nullptr; 
 	//ID3D11ShaderResourceView* emissiveTex = nullptr; 
+	
+	// TARFET RENDER TEXTURES
+	ID3D11ShaderResourceView *rttTexture = nullptr;
+	ID3D11Texture2D *rttMap = nullptr;
+	ID3D11Texture2D *depthBuffer = nullptr; 
+	
+	// MISC.
+	ID3D11InputLayout *inputLayout = nullptr; 
+	ID3D11SamplerState *samplerState = nullptr; 
+	ID3D11DepthStencilView *depthStencil = nullptr; 
+	D3D_DRIVER_TYPE DDT = D3D_DRIVER_TYPE_NULL; 
 
-
-
-
-
-
-
-
-
+	// RENDER TO TEXTURE VARIABLES
+	ID3D11RenderTargetView *renderTargetViewMap = nullptr;
+	ID3D11RasterizerState *cwCullMode = nullptr;
 
 public:
 	// Init
@@ -137,8 +187,9 @@ public:
 	~LetsDrawSomeStuff();
 	// Draw
 	void Render();
-
+	// Contols
 	void MoveCamera(); 
+	
 };
 
 // Init
@@ -154,11 +205,10 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			mySurface->GetSwapchain((void**)&mySwapChain);
 			mySurface->GetContext((void**)&myContext);
 			
-
-			//USE T
-			resize = attatchPoint; 
-			resize->GetClientHeight(height); 
-			resize->GetClientWidth(width); 
+			//attach point might be needed for resizing window
+			attPoint = attatchPoint; 
+			attPoint->GetClientHeight(height); 
+			attPoint->GetClientWidth(width); 
 			aspectR = (float)width / (float)height;
 
 
@@ -175,11 +225,15 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 
 
 			//////////////////////////////////////////////////////////////////////////////////////////////
-			///////////////////////////////////SECTION : MODELS //////////////////////////////////////////
+			///////////////////////////////////SECTION INIT 2: Models ////////////////////////////////////
 			//////////////////////////////////////////////////////////////////////////////////////////////
 			
-			////////////////////////// CUBE FOR CAMERAS //////////////////////////////////////////////
-			myVertex tri[]
+			//Buffer & Subresource descriptors for models 
+			D3D11_BUFFER_DESC bDesc = {};
+			D3D11_SUBRESOURCE_DATA subData;
+			
+			////////////////////////////////////// BASIC CUBE //////////////////////////////////////
+			myVertex cube[]
 			{ //xyzq, rgba, uv 
 				{ XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
 				{ XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
@@ -213,14 +267,12 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 
 			};
 
-			D3D11_BUFFER_DESC bDesc = {};
 			bDesc.Usage = D3D11_USAGE_DEFAULT;
 			bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 			bDesc.ByteWidth = sizeof(myVertex) * 24;
 			bDesc.CPUAccessFlags = 0;
 
-			D3D11_SUBRESOURCE_DATA subData;
-			subData.pSysMem = tri;
+			subData.pSysMem = cube;
 
 			myDevice->CreateBuffer(&bDesc, &subData, &vertexBuffer);
 
@@ -250,13 +302,12 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
 			bDesc.ByteWidth = sizeof(WORD) * 36;
 			bDesc.CPUAccessFlags = 0;
+
 			subData.pSysMem = indices;
 
 			myDevice->CreateBuffer(&bDesc, &subData, &indexBuffer);
 
-
-			///////////////////////////// SKYBOX //////////////////////////////////////////
-
+			///////////////////////////////// SKYBOX //////////////////////////////////////
 			myVertex SKYBOX[]
 			{ //xyzq, rgba, uv 
 				{ XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
@@ -330,9 +381,164 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 
 			myDevice->CreateBuffer(&bDesc, &subData, &skyIndexBuffer);
 
-								
-			///////////////////////// META //////////////////////////////
+			//////////////////////////////// KNIGHT //////////////////////////////////////
 
+			myVertex* tempKnight = new myVertex[1211];
+			for (int i = 0; i < 1211; i++)
+			{							 
+				tempKnight[i].Position.x = knight_data[i].pos[0];
+				tempKnight[i].Position.y = knight_data[i].pos[1];
+				tempKnight[i].Position.z = knight_data[i].pos[2];
+					
+				tempKnight[i].Normal.x = knight_data[i].nrm[0];
+				tempKnight[i].Normal.y = knight_data[i].nrm[1];
+				tempKnight[i].Normal.z = knight_data[i].nrm[2];
+					
+				tempKnight[i].Tex.x = knight_data[i].uvw[0];
+				tempKnight[i].Tex.y = knight_data[i].uvw[1];
+			}
+
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			bDesc.ByteWidth = sizeof(myVertex) * 1211;
+			bDesc.CPUAccessFlags = 0;
+
+			subData.pSysMem = tempKnight;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &knightVB);
+
+			WORD* tempKnightI = new WORD[2922];
+			for (int i = 0; i < 2922; i++)
+			{
+				tempKnightI[i] = knight_indicies[i];
+			}
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+			bDesc.ByteWidth = sizeof(WORD) * 2922;
+			bDesc.CPUAccessFlags = 0;
+			subData.pSysMem = tempKnightI;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &knightIB);
+
+			//////////////////////////////// RABBIT //////////////////////////////////////
+
+			myVertex* tempRabbitV = new myVertex[1172];
+			for (int i = 0; i < 1172; i++)
+			{
+				tempRabbitV[i].Position.x = Rabbit_data[i].pos[0];
+				tempRabbitV[i].Position.y = Rabbit_data[i].pos[1];
+				tempRabbitV[i].Position.z = Rabbit_data[i].pos[2];
+				
+				tempRabbitV[i].Normal.x = Rabbit_data[i].nrm[0];
+				tempRabbitV[i].Normal.y = Rabbit_data[i].nrm[1];
+				tempRabbitV[i].Normal.z = Rabbit_data[i].nrm[2];
+				
+				tempRabbitV[i].Tex.x = Rabbit_data[i].uvw[0];
+				tempRabbitV[i].Tex.y = Rabbit_data[i].uvw[1];
+			}
+
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			bDesc.ByteWidth = sizeof(myVertex) * 1172;
+			bDesc.CPUAccessFlags = 0;
+
+			subData.pSysMem = tempRabbitV;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &rabbitVB);
+
+			WORD* tempRabbitI = new WORD[3420];
+			for (int i = 0; i < 3420; i++)
+			{
+				tempRabbitI[i] = Rabbit_indicies[i];
+			}
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+			bDesc.ByteWidth = sizeof(WORD) * 3420;
+			bDesc.CPUAccessFlags = 0;
+			subData.pSysMem = tempRabbitI;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &rabbitIB);
+
+			//////////////////////////////// HOLY HAND //////////////////////////////////////
+
+			myVertex* tempholyhandV = new myVertex[6382];
+			for (int i = 0; i < 6382; i++)
+			{
+				tempholyhandV[i].Position.x = HHG3D_data[i].pos[0];
+				tempholyhandV[i].Position.y = HHG3D_data[i].pos[1];
+				tempholyhandV[i].Position.z = HHG3D_data[i].pos[2];
+				
+				tempholyhandV[i].Normal.x = HHG3D_data[i].nrm[0];
+				tempholyhandV[i].Normal.y = HHG3D_data[i].nrm[1];
+				tempholyhandV[i].Normal.z = HHG3D_data[i].nrm[2];
+				
+				tempholyhandV[i].Tex.x = HHG3D_data[i].uvw[0];
+				tempholyhandV[i].Tex.y = HHG3D_data[i].uvw[1];
+			}
+
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			bDesc.ByteWidth = sizeof(myVertex) * 6382;
+			bDesc.CPUAccessFlags = 0;
+
+			subData.pSysMem = tempholyhandV;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &holyhandVB);
+
+			WORD* tempholyhandI = new WORD[22674];
+			for (int i = 0; i < 22674; i++)
+			{
+				tempholyhandI[i] = HHG3D_indicies[i];
+			}
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+			bDesc.ByteWidth = sizeof(WORD) * 22674;
+			bDesc.CPUAccessFlags = 0;
+			subData.pSysMem = tempholyhandI;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &holyhandIB);
+
+			//////////////////////////////// THE GRAIL //////////////////////////////////////
+
+			myVertex* tempgrailV = new myVertex[3476];
+			for (int i = 0; i < 3476; i++)
+			{
+				tempgrailV[i].Position.x = grail_data[i].pos[0];
+				tempgrailV[i].Position.y = grail_data[i].pos[1];
+				tempgrailV[i].Position.z = grail_data[i].pos[2];
+				
+				tempgrailV[i].Normal.x = grail_data[i].nrm[0];
+				tempgrailV[i].Normal.y = grail_data[i].nrm[1];
+				tempgrailV[i].Normal.z = grail_data[i].nrm[2];
+				
+				tempgrailV[i].Tex.x = grail_data[i].uvw[0];
+				tempgrailV[i].Tex.y = grail_data[i].uvw[1];
+			}
+
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			bDesc.ByteWidth = sizeof(myVertex) * 3476;
+			bDesc.CPUAccessFlags = 0;
+
+			subData.pSysMem = tempgrailV;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &grailVB);
+
+			WORD* tempgrailI = new WORD[11382];
+			for (int i = 0; i < 11382; i++)
+			{
+				tempgrailI[i] = grail_indicies[i];
+			}
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+			bDesc.ByteWidth = sizeof(WORD) * 11382;
+			bDesc.CPUAccessFlags = 0;
+			subData.pSysMem = tempgrailI;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &grailIB);
+			
+			
+			//////////////////////////////// META KNIGHT //////////////////////////////////////
 			myVertex* tempMeta = new myVertex[5979]; 
 			for (int i = 0; i < 5979; i++)
 			{
@@ -355,8 +561,7 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 
 			subData.pSysMem = tempMeta;
 
-			myDevice->CreateBuffer(&bDesc, &subData, &metaVertexBuffer);
-
+			myDevice->CreateBuffer(&bDesc, &subData, &metaVB);
 
 			WORD* tempMetaIndices = new WORD[22242]; 
 			for (int i = 0; i < 22242; i++)
@@ -369,12 +574,92 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			bDesc.CPUAccessFlags = 0;
 			subData.pSysMem = tempMetaIndices;
 
-			myDevice->CreateBuffer(&bDesc, &subData, &metaIndexBuffer);
-			////////////////////// SECTION 3: MODELS END ////////////////////////////////////////
+			myDevice->CreateBuffer(&bDesc, &subData, &metaIB);
 
-			////////////////////// SECTION 4: work in progress( constant buffers, camera, shaders, textures////////////////////////////
+			//////////////////////////////// Cloud //////////////////////////////////////
+			myVertex* tempcloudV = new myVertex[7649];
+			for (int i = 0; i < 7649; i++)
+			{							  
+				tempcloudV[i].Position.x = cloud_data[i].pos[0];
+				tempcloudV[i].Position.y = cloud_data[i].pos[1];
+				tempcloudV[i].Position.z = cloud_data[i].pos[2];
+										
+				tempcloudV[i].Normal.x = cloud_data[i].nrm[0];
+				tempcloudV[i].Normal.y = cloud_data[i].nrm[1];
+				tempcloudV[i].Normal.z = cloud_data[i].nrm[2];
 
-			// Create Constant Buffer
+				tempcloudV[i].Tex.x = cloud_data[i].uvw[0];
+				tempcloudV[i].Tex.y = cloud_data[i].uvw[1];
+			}
+
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			bDesc.ByteWidth = sizeof(myVertex) * 7649;
+			bDesc.CPUAccessFlags = 0;
+
+			subData.pSysMem = tempcloudV;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &cloudVB);
+
+			WORD* tempcloudI = new WORD[8553];
+			for (int i = 0; i < 8553; i++)
+			{
+				tempcloudI[i] = cloud_indicies[i];
+			}
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+			bDesc.ByteWidth = sizeof(WORD) * 8553;
+			bDesc.CPUAccessFlags = 0;
+			subData.pSysMem = tempcloudI;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &cloudIB);
+
+			//////////////////////////////// Sephiroth  /////////////////////////////////
+
+			myVertex* sephirothV = new myVertex[6224];
+			for (int i = 0; i < 6224; i++)
+			{
+				sephirothV[i].Position.x = sephiroth_data[i].pos[0];
+				sephirothV[i].Position.y = sephiroth_data[i].pos[1];
+				sephirothV[i].Position.z = sephiroth_data[i].pos[2];
+				
+				sephirothV[i].Normal.x = sephiroth_data[i].nrm[0];
+				sephirothV[i].Normal.y = sephiroth_data[i].nrm[1];
+				sephirothV[i].Normal.z = sephiroth_data[i].nrm[2];
+										
+				sephirothV[i].Tex.x = sephiroth_data[i].uvw[0];
+				sephirothV[i].Tex.y = sephiroth_data[i].uvw[1];
+			}						
+
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			bDesc.ByteWidth = sizeof(myVertex) * 6224;
+			bDesc.CPUAccessFlags = 0;
+
+			subData.pSysMem = sephirothV;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &sephirothVB);
+
+			WORD* sephirothI = new WORD[7128];
+			for (int i = 0; i < 7128; i++)
+			{
+				sephirothI[i] = sephiroth_indicies[i];
+			}
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+			bDesc.ByteWidth = sizeof(WORD) * 7128;
+			bDesc.CPUAccessFlags = 0;
+			subData.pSysMem = sephirothI;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &sephirothIB);
+
+
+
+			//////////////////////////////////////////////////////////////////////////////////////////////
+			//////////////////SECTION INIT 3: Buffers, Shaders, Textures, Camera /////////////////////////
+			//////////////////////////////////////////////////////////////////////////////////////////////
+
+			/////////////////// Create Constant Buffer(s) // you can use bDesc instead? 
 			D3D11_BUFFER_DESC constantBufferDesc = {};
 			constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 			constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
@@ -384,7 +669,7 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			myDevice->CreateBuffer(&constantBufferDesc, nullptr, &constantBuffer);
 
 
-			//write and compile & load our shaders
+			/////////////////// Write, compile & load our shaders
 			myDevice->CreatePixelShader(&PS_shader, sizeof(PS_shader), nullptr, &myPixelShader);
 			myDevice->CreatePixelShader(&PS_texture, sizeof(PS_texture), nullptr, &myTextureShader);
 			myDevice->CreateVertexShader(&VS_shader, sizeof(VS_shader), nullptr, &myVertexShader);
@@ -392,7 +677,35 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			myDevice->CreateVertexShader(&VS_sky, sizeof(VS_sky), nullptr, &mySkyVshader);
 			myDevice->CreatePixelShader(&PS_point, sizeof(PS_point), nullptr, &myPointShader); 
 
+			/////////////////// Create Sampler, & Load Textures
 			D3D11_SAMPLER_DESC sDesc = {}; 
+
+			CreateDDSTextureFromFile(myDevice, L"blackarmor.dds", nullptr, &knightTex);
+			sDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+			sDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+			sDesc.MinLOD = 0;
+			sDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+			CreateDDSTextureFromFile(myDevice, L"fur.dds", nullptr, &rabbitTex);
+			sDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+			sDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+			sDesc.MinLOD = 0;
+			sDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+			CreateDDSTextureFromFile(myDevice, L"gold.dds", nullptr, &goldTex);
+			sDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+			sDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+			sDesc.MinLOD = 0;
+			sDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
 			CreateDDSTextureFromFile(myDevice, L"metaTexture.dds", nullptr, &textureResource);
 			sDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -403,7 +716,16 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 			sDesc.MinLOD = 0;
 			sDesc.MaxLOD = D3D11_FLOAT32_MAX;
 			
-			CreateDDSTextureFromFile(myDevice, L"SkyboxOcean.dds", nullptr, &skyResource); 
+			CreateDDSTextureFromFile(myDevice, L"ff7.dds", nullptr, &skyResource); 
+			sDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+			sDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+			sDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+			sDesc.MinLOD = 0;
+			sDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+			CreateDDSTextureFromFile(myDevice, L"SkyboxCastle2.dds", nullptr, &skyCastleResource);
 			sDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 			sDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
 			sDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
@@ -414,18 +736,56 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 
 			myDevice->CreateSamplerState(&sDesc, &samplerState);
 
+			/////////////////////////////// Create Texture Desc, Render Target View & Shader Resource View (for render to texture)
+			
+			
+			D3D11_TEXTURE2D_DESC tDesc;
+			ZeroMemory(&tDesc, sizeof(tDesc));
+			tDesc.Width = width;
+			tDesc.Height = height;
+			tDesc.MipLevels = 1;
+			tDesc.ArraySize = 1;
+			tDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+			tDesc.SampleDesc.Count = 1;
+			tDesc.Usage = D3D11_USAGE_DEFAULT;
+			tDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+			tDesc.CPUAccessFlags = 0;
+			tDesc.MiscFlags = 0;
 
-			//INIT CAMERA
+			myDevice->CreateTexture2D(&tDesc, NULL, &rttMap); 
+			
+			D3D11_RENDER_TARGET_VIEW_DESC rtvDesc;
+			rtvDesc.Format = tDesc.Format;
+			rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+			rtvDesc.Texture2D.MipSlice = 0;
+		
+			myDevice->CreateRenderTargetView(rttMap, &rtvDesc, &renderTargetViewMap);
+			
+			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc; 		
+			srvDesc.Format = tDesc.Format;
+			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+			srvDesc.Texture2D.MostDetailedMip = 0;
+			srvDesc.Texture2D.MipLevels = 1;
+			
+			myDevice->CreateShaderResourceView(rttMap, &srvDesc, &rttTexture); 
+			
+			D3D11_RASTERIZER_DESC rasterDesc;
+			ZeroMemory(&rasterDesc, sizeof(D3D11_RASTERIZER_DESC));
+			rasterDesc.FillMode = D3D11_FILL_SOLID;
+			rasterDesc.CullMode = D3D11_CULL_BACK;		
+			rasterDesc.FrontCounterClockwise = false;
+			
+			//myDevice->CreateRasterizerState(&rasterDesc, &cwCullMode); 			
+			myDevice->CreateTexture2D(&tDesc, NULL, &depthBuffer);  
+
+			//////////////////// Init Camera
 			worldMat = XMMatrixIdentity();
-
 			//init View Matrix
-			camera.eye = XMVectorSet(0.0f, 5.0f, -30.0f, 0.0f);
-			camera.at = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+			camera.eye = XMVectorSet(0.0f, -2.5f, -30.0f, 0.0f);
+			camera.at = XMVectorSet(0.0f, 10.0f, 0.0f, 0.0f);
 			camera.up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 			viewMat = XMMatrixLookAtRH(camera.eye, camera.at, camera.up);
-
-			//init Projection Matrix
-			
+			//init Projection Matrix		
 			projectionMat = XMMatrixPerspectiveFovRH(XMConvertToRadians(65)/camera.camZoom, mySurface->GetAspectRatio(aspectR), camera.nearPlane, camera.farPlane);
 		}
 	}
@@ -438,7 +798,8 @@ LetsDrawSomeStuff::~LetsDrawSomeStuff()
 	myDevice->Release();
 	mySwapChain->Release();
 	myContext->Release();
-	// SHADERS
+	
+	//SHADERS
 	myVertexShader->Release(); 
 	mySkyVshader->Release(); 
 	myPixelShader->Release(); 
@@ -448,20 +809,49 @@ LetsDrawSomeStuff::~LetsDrawSomeStuff()
 
 	//BUFFERS
 	constantBuffer->Release();
+	depthBuffer->Release(); 
+
 	vertexBuffer->Release();
 	indexBuffer->Release();
 	skyVertexBuffer->Release(); 
 	skyIndexBuffer->Release(); 
-	metaVertexBuffer->Release(); 
-	metaIndexBuffer->Release(); 
+	metaVB->Release(); 
+	metaIB->Release(); 
+	knightVB->Release(); 
+	knightIB->Release(); 
+	rabbitVB->Release(); 
+	rabbitIB->Release(); 
+	holyhandVB->Release(); 
+	holyhandIB->Release(); 
+	grailVB->Release(); 
+	grailIB->Release(); 
+	cloudVB->Release(); 
+	cloudIB->Release(); 
+	sephirothVB->Release(); 
+	sephirothIB->Release(); 
+
 
 	//TEXTURES 
-	textureResource->Release(); 
+	textureResource->Release(); //fake metal tex 
+	knightTex->Release(); 
+	rabbitTex->Release(); 
+	goldTex->Release(); 
+
+	skyResource->Release(); 
+	skyCastleResource->Release(); 
+	
+	rttTexture->Release(); // render to target
+	rttMap->Release();  // render to target
+
+	//MISC
 	samplerState->Release();
-
-
+	depthStencil->Release(); 
+	renderTargetViewMap->Release(); 
+	cwCullMode->Release(); 
+	
 
 	// TODO: "Release()" more stuff here!
+
 
 	if (mySurface) // Free Gateware Interface
 	{
@@ -485,42 +875,8 @@ void LetsDrawSomeStuff::Render()
 			{
 				myContext->ClearDepthStencilView(myDepthStencilView, D3D11_CLEAR_DEPTH, 1, 0); // clear it to Z exponential Far.
 				myDepthStencilView->Release();
-			}
+			}	
 
-			/*if (mySwapChain)
-			//{
-			//	resize->GetClientHeight(height);
-			//	resize->GetClientWidth(width);
-			//	aspectR = (float)width / (float)height;
-			//	resize->ResizeWindow(height, width);
-			//	resize.
-				//myContext->OMSetRenderTargets(0, 0, 0);
-				//myRenderTargetView->Release();
-				//mySwapChain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
-
-				//ID3D11Texture2D* pBuffer;
-				//mySwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&pBuffer);
-
-				//myDevice->CreateRenderTargetView(pBuffer, NULL, &myRenderTargetView);
-
-				//pBuffer->Release();
-
-				//myContext->OMSetRenderTargets(1, &myRenderTargetView, NULL);
-
-				//D3D11_VIEWPORT re;
-				//resize->GetClientWidth(width);
-				//resize->GetClientHeight(height);
-				//re.Width = (float)width;
-				//re.Height = (float)height;
-				//re.MinDepth = 0.0f;
-				//re.MaxDepth = 1.0f;
-				//re.TopLeftX = 0;
-				//re.TopLeftY = 0;
-				//myContext->RSSetViewports(1, &re);
-
-				//resize->ResizeWindow
-			//}*/
-			
 			// Set active target for drawing, all array based D3D11 functions should use a syntax similar to below
 			ID3D11RenderTargetView* const targets[] = { myRenderTargetView };
 			myContext->OMSetRenderTargets(1, targets, myDepthStencilView);
@@ -529,22 +885,29 @@ void LetsDrawSomeStuff::Render()
 			const float d_green[] = { 0, 0.5f, 0, 1 };
 			myContext->ClearRenderTargetView(myRenderTargetView, d_green);
 			
+
+			D3D11_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+			ZeroMemory(&dsvDesc, sizeof(D3D11_DEPTH_STENCIL_VIEW_DESC));
+			dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+			dsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMS;
+			myDevice->CreateDepthStencilView(depthBuffer, &dsvDesc, &depthStencil);
+
 			// TODO: Set your shaders, Update & Set your constant buffers, Attatch your vertex & index buffers, Set your InputLayout & Topology & Draw!
 
-			myContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			myContext->IASetInputLayout(inputLayout);
-
+			myContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			myContext->PSSetSamplers(0, 1, &samplerState);
-			//myContext->PSSetShaderResources(0, 1, &textureResource);
 
 			UINT stride = sizeof(myVertex);
 			UINT offset = 0;
+												//0			  //1		  //2		   //3			//4		  //5			//6				//7			//8
+			ID3D11Buffer *tempBuffer[] = { {vertexBuffer}, {knightVB}, {rabbitVB}, {holyhandVB}, {grailVB}, {metaVB}, {skyVertexBuffer}, {cloudVB}, {sephirothVB} };
 
-			ID3D11Buffer *tempBuffer[] = { {vertexBuffer }, {metaVertexBuffer} , {skyVertexBuffer} };
+			//Camera Movement & Controls
+			MoveCamera(); 
 
 
-			////////////////////////////////////LIGHTS////////////////////////////////////
-			// you originally declared T here (look into using xTIME instead) 
+			//TODO: look into using a better timer ( xtime ) 
 			static float t = +(float)XM_PI * 0.0125f;
 			if (DDT == D3D_DRIVER_TYPE_REFERENCE)
 			{
@@ -559,187 +922,476 @@ void LetsDrawSomeStuff::Render()
 				t = (timeCur - timeStart) / 1000.0f;
 			}
 
-			//Camera Movement
-			MoveCamera(); 
 
-			// Rotate cube around the origin
-			worldMat = XMMatrixRotationY(t);
-
-
-			XMFLOAT4 vLightDirs[2] =
-			{
-				XMFLOAT4(-0.577f, 0.577f, -0.577f, 1.0f),
-				XMFLOAT4(0.0f, 0.0f, -1.0f, 1.0f),
-			};
-			XMFLOAT4 vLightColors[2] =
-			{
-				XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f),
-				XMFLOAT4(0.5f, 0.0f, 0.0f, 1.0f)
-			};
-			XMMATRIX mRotate = XMMatrixRotationY(-2.0f * t);
-			XMVECTOR vLightDir = XMLoadFloat4(&vLightDirs[1]);
-			vLightDir = XMVector3Transform(vLightDir, mRotate);
-			XMStoreFloat4(&vLightDirs[1], vLightDir);
-
+			//////////////////////////////////////////////////////////////////////////////////////////////
+			///////////////////////////////////SECTION RENDER: Models/////////////////////////////////////
+			//////////////////////////////////////////////////////////////////////////////////////////////
+			
+			//HINT: use rot , trans, scale for model transformations (create unique matrix for special purposes)
 
 			ConstantBuffer constBuffer;
+			
+			constBuffer.pointLight = pointPos;
+			constBuffer.spotLight = spotPos;
 
-			//COPY PASE THIS BLOCK OF CODE FOR DRAWIN, JUST REMEMBER TO CHANGE VERTEX AND PIXEL SHADERS.
-			constBuffer.mWorld = XMMatrixTranspose(worldMat);
-			constBuffer.mView = XMMatrixTranspose(viewMat);
-			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
-			constBuffer.vLightDir[0] = vLightDirs[0];
-			constBuffer.vLightDir[1] = vLightDirs[1];
-			constBuffer.vLightCol[0] = vLightColors[0];
-			constBuffer.vLightCol[1] = vLightColors[1];
-			constBuffer.vOutputCol = XMFLOAT4(1.0f, 0.0f, 0.0f, 0.0f);
-			myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
-			myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
-
-			//Vertex shader
-			myContext->PSSetShader(myPixelShader, 0, 0);
-			//Pixel Shader					
-			myContext->VSSetShader(myVertexShader, 0, 0);
-			myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
-			myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
-
-			myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
-			myContext->DrawIndexed(36, 0, 0);
-			//STOP THE COPY PASTE.
-
-			///// UPDATE LIGHTS
-			for (int m = 0; m < 2; m++)
+			if (scene == 1) // RENDER MONTY PYTHON THEME
 			{
+
+				constBuffer.pointIntensity = 5.0f;
+				constBuffer.spotIntensity = 1.0f;
+				constBuffer.vOutputCol = XMFLOAT4(.95f, .90f, .250f, 1.0f); 
+				constBuffer.spotCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+
+				/////////////////////////////////////KNIGHT
+				scale = XMMatrixScaling(5.0f, 5.0f, 5.0f);
+				trans = XMMatrixTranslation(2.0f, -1.0f, 0.0f);
+				rot = XMMatrixRotationY(4.0f);
+
+				constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * rot * trans * scale );
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[1], &stride, &offset);
+				myContext->IASetIndexBuffer(knightIB, DXGI_FORMAT_R16_UINT, 0);
+
+				myContext->PSSetShaderResources(0, 1, &knightTex);
+
+				myContext->PSSetShader(myTextureShader, 0, 0);
+				myContext->VSSetShader(myVertexShader, 0, 0);
+
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				myContext->DrawIndexed(2922, 0, 0);
+
+				/////////////////////////////////////////RABBIT
+				scale = XMMatrixScaling(.1f, .1f, .1f);
+				trans = XMMatrixTranslation(-10.0f, -5.0f, 3.0f);
+				rot = XMMatrixRotationY(3.0f);
+
+				constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * rot * trans);
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[2], &stride, &offset);
+				myContext->IASetIndexBuffer(rabbitIB, DXGI_FORMAT_R16_UINT, 0);
+
+				myContext->PSSetShaderResources(0, 1, &rabbitTex);
+
+				myContext->PSSetShader(myTextureShader, 0, 0);
+				myContext->VSSetShader(myVertexShader, 0, 0);
+
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				myContext->DrawIndexed(3420, 0, 0);
+
+				///////////////////////////////////////////HOLY HAND GRENADE
+
+				scale = XMMatrixScaling(1.0f, 1.0f, 1.0f);
+				//trans = XMMatrixTranslation(0.0f, 0.0f, 0.0f);
+				//rot = XMMatrixRotationY(0f);
+
+				constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale);//* rot * trans);
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[4], &stride, &offset);
+				myContext->IASetIndexBuffer(holyhandIB, DXGI_FORMAT_R16_UINT, 0);
+
+				myContext->PSSetShaderResources(0, 1, &textureResource);
+
+				myContext->PSSetShader(myTextureShader, 0, 0);
+				myContext->VSSetShader(myVertexShader, 0, 0);
+
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				myContext->DrawIndexed(22674, 0, 0);
+
+				///////////////////////////////////////////HOLY GRAIL
+
+				scale = XMMatrixScaling(25.0f, 25.0f, 25.0f);
+				rot = XMMatrixRotationX(0.25f);
+				grailMat = XMMatrixRotationY(t);
+
+				constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * rot * grailMat);
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[4], &stride, &offset);
+				myContext->IASetIndexBuffer(grailIB, DXGI_FORMAT_R16_UINT, 0);
+
+				myContext->PSSetShaderResources(0, 1, &goldTex);
+
+				myContext->PSSetShader(myPointShader, 0, 0);
+				myContext->VSSetShader(myVertexShader, 0, 0);
+
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				myContext->DrawIndexed(824091, 0, 0);
 				
-				XMMATRIX mLight = XMMatrixTranslationFromVector(5.0f * XMLoadFloat4(&vLightDirs[m]));
-				XMMATRIX mLightScale = XMMatrixScaling(0.2f, 0.2f, 0.2f);
-				mLight = mLightScale * mLight;
+				///////////////////////// Floor
+			
+				scale = XMMatrixScaling(25.0f, 0.1f, 25.0f);
+				trans = XMMatrixTranslation(0.0f, -5.0f, 0.0f);
+
+				constBuffer.mWorld = XMMatrixTranspose(worldMat * scale * trans);
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+				constBuffer.spotIntensity = 30.0f; 
+				constBuffer.pointIntensity = 3.0f; 
+				constBuffer.vOutputCol = XMFLOAT4(.95f, .90f, .250f, 1.0f);
+				constBuffer.spotCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 				
-				// Update the world variable to reflect the current light
-				constBuffer.mWorld = XMMatrixTranspose(mLight);
-				constBuffer.vOutputCol = vLightColors[m];
-				myContext->PSSetShader(myPixelShader, NULL, 0);
-				myContext->UpdateSubresource(constantBuffer, 0, NULL, &constBuffer, 0, 0);
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
+				myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
+
+				myContext->PSSetShaderResources(0, 1, &textureResource);
+				
+				myContext->PSSetShader(myPointShader, 0, 0);
+				myContext->VSSetShader(myVertexShader, 0, 0);
+
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
 				myContext->DrawIndexed(36, 0, 0);
+
+			}
+			else // RENDER CUSTOM THEME (Final Fantasy VII) 
+			{
+
+				/////////////////////// CLOUD 
+				scale = XMMatrixScaling(.05f, .05f, .05f);
+				rot = XMMatrixRotationX(XMConvertToRadians(180.0f));
+				trans = XMMatrixTranslation(-5.0f, 0.0f, 0.0f);
+
+				constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * rot * trans);
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[7], &stride, &offset);
+				myContext->IASetIndexBuffer(cloudIB, DXGI_FORMAT_R16_UINT, 0);
+
+				myContext->PSSetShaderResources(0, 1, &goldTex);
+
+				myContext->PSSetShader(myPointShader, 0, 0);
+				myContext->VSSetShader(myVertexShader, 0, 0);
+
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				myContext->DrawIndexed(8553, 0, 0);
+
+
+				/////////////////////// Sephiroth
+				scale = XMMatrixScaling(.05f, .05f, .05f);
+				rot = XMMatrixRotationX(XMConvertToRadians(180.0f));
+				trans = XMMatrixTranslation(5.0f, 0.0f, 0.0f); 
+
+				constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * rot * trans );
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[8], &stride, &offset);
+				myContext->IASetIndexBuffer(sephirothIB, DXGI_FORMAT_R16_UINT, 0);
+
+				myContext->PSSetShaderResources(0, 1, &goldTex);
+
+				myContext->PSSetShader(myPointShader, 0, 0);
+				myContext->VSSetShader(myVertexShader, 0, 0);
+
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				myContext->DrawIndexed(7128, 0, 0);
+
+				//////////////////////////////////////////////
+				// Rotate cube around the origin
+				//worldMat = XMMatrixRotationY(t);
+				worldMat = XMMatrixIdentity();
+				XMFLOAT4 vLightDirs[2] =
+				{
+					XMFLOAT4(-0.577f, 0.577f, -0.577f, 1.0f),
+					XMFLOAT4(0.0f, 0.0f, -1.0f, 1.0f),
+				};
+				XMFLOAT4 vLightColors[2] =
+				{
+					XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f),
+					XMFLOAT4(0.5f, 0.0f, 0.0f, 1.0f)
+				};
+				XMMATRIX mRotate = XMMatrixRotationY(-2.0f * t);
+				XMVECTOR vLightDir = XMLoadFloat4(&vLightDirs[1]);
+				vLightDir = XMVector3Transform(vLightDir, mRotate);
+				XMStoreFloat4(&vLightDirs[1], vLightDir);
+
+
+
+
+				//COPY PASE THIS BLOCK OF CODE FOR DRAWIN, JUST REMEMBER TO CHANGE VERTEX AND PIXEL SHADERS.
+				constBuffer.mWorld = XMMatrixTranspose(worldMat * XMMatrixRotationY(t));
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+				constBuffer.vLightDir[0] = vLightDirs[0];
+				constBuffer.vLightDir[1] = vLightDirs[1];
+				constBuffer.vLightCol[0] = vLightColors[0];
+				constBuffer.vLightCol[1] = vLightColors[1];
+				constBuffer.vOutputCol = XMFLOAT4(1.0f, 0.0f, 0.0f, 0.0f);
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
+				myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
+
+				//Vertex shader
+				myContext->PSSetShader(myPixelShader, 0, 0);
+				//Pixel Shader					
+				myContext->VSSetShader(myVertexShader, 0, 0);
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				myContext->DrawIndexed(36, 0, 0);
+				//STOP THE COPY PASTE.
+
+				///// UPDATE LIGHTS
+				for (int m = 0; m < 2; m++)
+				{
+
+					XMMATRIX mLight = XMMatrixTranslationFromVector(5.0f * XMLoadFloat4(&vLightDirs[m]));
+					XMMATRIX mLightScale = XMMatrixScaling(0.2f, 0.2f, 0.2f);
+					mLight = mLightScale * mLight;
+
+					// Update the world variable to reflect the current light
+					constBuffer.mWorld = XMMatrixTranspose(mLight);
+					constBuffer.vOutputCol = vLightColors[m];
+					myContext->PSSetShader(myPixelShader, NULL, 0);
+					myContext->UpdateSubresource(constantBuffer, 0, NULL, &constBuffer, 0, 0);
+					myContext->DrawIndexed(36, 0, 0);
+				}
+
+				////////////////////////// META
+
+				//constBuffer.vOutputCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+				scale = XMMatrixScaling(1 / 5.0f, 1 / 5.0f, 1 / 5.0f);
+
+				constBuffer.mWorld = XMMatrixTranspose(worldMat * scale * metaMat);
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+
+				myContext->PSSetShaderResources(0, 1, &textureResource);
+
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[5], &stride, &offset);
+				myContext->IASetIndexBuffer(metaIB, DXGI_FORMAT_R16_UINT, 0);
+
+
+				myContext->PSSetShader(myPointShader, 0, 0); // THE LIGHT WILL AFFECT THE MODEL! :-)
+				myContext->VSSetShader(myVertexShader, 0, 0);
+
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				myContext->DrawIndexed(22242, 0, 0);
+
+
+				////////////////// AFTER MODELS REMEMBER TO TURN UP INTENSITY FOR FLOOR AND ETC.
+				constBuffer.spotIntensity = 30.0f;
+				constBuffer.vOutputCol = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+
+				///// EHHH use this for something below
+				//wconstBuffer.Intensity = 30.0f;
+
+				///////////////////////// Floor
+				//Update Matrices 
+				myContext->PSSetShaderResources(0, 1, &textureResource);
+				scale = XMMatrixScaling(30.0f, 0.05f, 30.0f);
+				trans = XMMatrixTranslation(0.0f, -5.0f, 0.0f);
+				//Update Constant Buffer (matrices, colors, lights, and more); 
+				constBuffer.mWorld = XMMatrixTranspose(worldMat * scale * trans);
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+				//Set InputLayouts
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
+				myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
+				//Set Shaders
+				myContext->PSSetShader(myPointShader, 0, 0);
+				myContext->VSSetShader(myVertexShader, 0, 0);
+				//Set Buffers
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+				//Update subresources and Draw
+				//myContext->PSSetShaderResources(0, 1, &textureResource);
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				myContext->DrawIndexed(36, 0, 0);
+				//STOP THE COPY PASTE.
+
 			}
 
-			//////////////////////////////////////////////////////////////////////////////////////////////
-			///////////////////////////////////SECTION 2: MODELS//////////////////////////////////////////
-			//////////////////////////////////////////////////////////////////////////////////////////////
-			XMMATRIX scale;
-			XMMATRIX trans; 
-		
-			constBuffer.pointLight = pointPos; 
-			constBuffer.spotLight = spotPos; 
-			constBuffer.vOutputCol = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-			
-			/////////////////MODEL : FLoor
-			myContext->PSSetShaderResources(0, 1, &textureResource);
 
-			scale = XMMatrixScaling(30.0f, 0.05f, 30.0f);
-			trans = XMMatrixTranslation(0.0f, -5.0f, 0.0f); 
+			////////////////////////BOTH SCENES WILL USE CUBES TO INDICATE LIGHT LOCATIONS AND SKYBOXES
+			if (cubesOn)
+			{
+				////////////////////////// Spot Light Cube
+				scale = XMMatrixScaling(.5f, .5f, .5f);
+
+				constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * spotMat);
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+				myContext->PSSetShaderResources(0, 1, &textureResource);
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
+				myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
+				myContext->PSSetShader(myPointShader, 0, 0);
+				myContext->VSSetShader(myVertexShader, 0, 0);
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				myContext->DrawIndexed(36, 0, 0);
+
+				////////////////////////// Point Light Cube
+				scale = XMMatrixScaling(.5f, .5f, .5f);
+				constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * pointMat);
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+				myContext->PSSetShaderResources(0, 1, &textureResource);
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
+				myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
+				myContext->PSSetShader(myPointShader, 0, 0);
+				myContext->VSSetShader(myVertexShader, 0, 0);
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				myContext->DrawIndexed(36, 0, 0);
+			}
 			
-			
-			constBuffer.mWorld = XMMatrixTranspose(worldMat * scale * trans);
+			////////////////////////////////////////////////////////////////////////////////////////////
+			////////////////////////////////// SECTION: SKYBOX /////////////////////////////////////////
+			////////////////////////////////////////////////////////////////////////////////////////////
+
+
+			switch (scene)
+			{
+			case 1: 
+				myContext->PSSetShaderResources(0, 1, &skyCastleResource);
+				trans = XMMatrixTranslation(0.0f, 20.0f, 0.0f);
+				scale = XMMatrixScaling(105.0f, 105.0f, 105.0f);
+				break;
+			case 2: 
+				myContext->PSSetShaderResources(0, 1, &skyResource);
+				trans = XMMatrixTranslation(0.0f, 0.0f, 0.0f);
+				scale = XMMatrixScaling(105.0f, 105.0f, 105.0f);
+				break; 
+			default:
+				break;
+			}
+
+			constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * skyMat * trans);
 			constBuffer.mView = XMMatrixTranspose(viewMat);
 			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
-
-			myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
-			myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
-
-			//Vertex shader 
-			myContext->PSSetShader(myPointShader, 0, 0);
-			//Pixel Shader					
-			myContext->VSSetShader(myVertexShader, 0, 0);
+			//constBuffer.vOutputCol = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+			myContext->IASetVertexBuffers(0, 1, &tempBuffer[6], &stride, &offset);
+			myContext->IASetIndexBuffer(skyIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+			myContext->PSSetShader(mySkyPshader, 0, 0);			
+			myContext->VSSetShader(mySkyVshader, 0, 0);
 			myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
 			myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
-
 			myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
 			myContext->DrawIndexed(36, 0, 0);
-			//STOP THE COPY PASTE.
 
-			////////////////////////////MODEL : SPOT CAM BOX
+			////////////////////////////////////////////////////////////////////////////////////////////
+			///////////////////////////////////// RENDER TEXTURE TO CUBE ///////////////////////////////
+			////////////////////////////////////////////////////////////////////////////////////////////
 
-			scale = XMMatrixScaling(1.0f, 1.0f, 1.0f);
-			constBuffer.vOutputCol = XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f);
+			myContext->OMSetRenderTargets(1, &renderTargetViewMap, myDepthStencilView);
+			myContext->ClearRenderTargetView(renderTargetViewMap, DirectX::Colors::Green);
 
-			constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * spotMat);
+			////////////////////////What will be textured onto the surface goes below 
+
+
+			scale = XMMatrixScaling(1 / 5.0f, 1 / 5.0f, 1 / 5.0f);
+			rot = XMMatrixRotationZ(60.0f); 
+			constBuffer.mWorld = XMMatrixTranspose(worldMat * XMMatrixRotationY(t) * scale * renderCubeIn * rot);
 			constBuffer.mView = XMMatrixTranspose(viewMat);
 			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
 
-			myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
-			myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
-
-			//Vertex shader
-			myContext->PSSetShaderResources(0, 1, &textureResource);
-			myContext->PSSetShader(myTextureShader, 0, 0);
-			//Pixel Shader					
-			myContext->VSSetShader(myVertexShader, 0, 0);
-			myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
-			myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
-
-			myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
-			myContext->DrawIndexed(36, 0, 0);
-
-			//////////////////////////////MODEL : META
+			constBuffer.vOutputCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 			
 			myContext->PSSetShaderResources(0, 1, &textureResource);
 
-			scale = XMMatrixScaling(1/5.0f, 1 / 5.0f, 1 / 5.0f); 
-			constBuffer.mWorld = XMMatrixTranspose(worldMat * scale * metaMat);
-			constBuffer.mView = XMMatrixTranspose(viewMat);
-			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
-			myContext->PSSetShader(myTextureShader, 0, 0);
-			//constBuffer.vOutputCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-			myContext->IASetVertexBuffers(0, 1, &tempBuffer[1], &stride, &offset);
-			myContext->IASetIndexBuffer(metaIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+			myContext->IASetVertexBuffers(0, 1, &tempBuffer[5], &stride, &offset);
+			myContext->IASetIndexBuffer(metaIB, DXGI_FORMAT_R16_UINT, 0);
 
-			////Pixel shader
-			//myContext->PSSetShader(myPixelShader, 0, 0);
-			////Vertex Shader					
-			myContext->VSSetShader(myVertexShader, 0, 0);
+			//myContext->VSSetShader(myVertexShader, 0, 0);
+			myContext->PSSetShader(myPixelShader, 0, 0); 
+
 			myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
 			myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
-
+			
+			myContext->PSSetSamplers(0, 1, &samplerState);
 			myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
 			myContext->DrawIndexed(22242, 0, 0);
 
 
-			//////////////////////////////////////////////////////////////////////////////////////////////
-			///////////////////////////////////SECTION 3: SKYBOX /////////////////////////////////////////
-			//////////////////////////////////////////////////////////////////////////////////////////////
+			////////////////////////CUBE
+			//scale = XMMatrixScaling(5.0f, 5.0, 5.0f);
 
-			//Object data
-			myContext->PSSetShaderResources(0, 1, &skyResource);
-			
-			scale = XMMatrixScaling(100.0f, 100.0f, 100.0f); 
-			constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * skyMat);
+			//constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity()* scale * renderCube2);
+			//constBuffer.mView = XMMatrixTranspose(viewMat);
+			//constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+
+			//constBuffer.vOutputCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+			//
+			//myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
+			//myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
+			//
+			////myContext->VSSetShader(myVertexShader, 0, 0);
+			//myContext->PSSetShader(myPixelShader, 0, 0);
+			//
+			//myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+			//myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+			//
+			//myContext->PSSetSamplers(0, 1, &samplerState);
+			//myContext->UpdateSubresource(constantBuffer, 0, NULL, &constBuffer, 0, 0);
+			//myContext->DrawIndexed(36, 0, 0);
+		
+
+			/////////////////////Surface that will have textures renders ONTO
+			myContext->OMSetRenderTargets(1, targets, myDepthStencilView);
+
+			scale = XMMatrixScaling(5.0f, 5.0, 0.0f);
+
+			constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity()* scale * renderCube);
 			constBuffer.mView = XMMatrixTranspose(viewMat);
 			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
-			//Set Vertex and Index buffers
-			myContext->IASetVertexBuffers(0, 1, &tempBuffer[2], &stride, &offset);
-			myContext->IASetIndexBuffer(skyIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
-			//Pixel shader
-			myContext->PSSetShader(mySkyPshader, 0, 0);
-			//Vertex Shader					
-			myContext->VSSetShader(mySkyVshader, 0, 0);
-			//Constant Buffers for V and P shaders
-			myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+			
+			myContext->PSSetShaderResources(0, 1, &rttTexture);
+			myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
+			myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
+			myContext->PSSetShader(myTextureShader, 0, 0);
+			myContext->UpdateSubresource(constantBuffer, 0, NULL, &constBuffer, 0, 0);
 			myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
-			myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+			myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+			myContext->PSSetSamplers(0, 1, &samplerState);
 			myContext->DrawIndexed(36, 0, 0);
+
+			
+			
 
 			//////////////////////////////////////////////////////////////////////////////////////////////
 			///////////////////////////////////SECTION 4: SwapChain & more ///////////////////////////////
 			//////////////////////////////////////////////////////////////////////////////////////////////
 
-
-	
 			////////////////////////////// UPDATE CAMERA //////////////////////////////////// 
 			constBuffer.mView = XMMatrixTranspose(viewMat); 
+			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
 			myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
-			////////////////////////////// END UPDATE ///////////////////////////////////////
-		
+
+			/////////////////////////////// UPDATE SWAP CHAIN////////////////////////////////
 
 			// Present Backbuffer using Swapchain object
 			// Framerate is currently unlocked, we suggest "MSI Afterburner" to track your current FPS and memory usage.
@@ -748,7 +1400,6 @@ void LetsDrawSomeStuff::Render()
 			// Free any temp DX handles aquired this frame
 			myRenderTargetView->Release();
 
-			//mySwapChain->ResizeBuffers(0,0,0, XGI_FORMAT_UNKNOWN, 0)
 		}
 	}
 }
@@ -765,55 +1416,55 @@ void LetsDrawSomeStuff::MoveCamera()
 	//MOVE Forward, Back, Left, Right
 	if (GetAsyncKeyState('W'))
 	{
-		camera.posZ -= camera.speed *.05f;
+		camera.posZ -= camera.speed *.2f;
 	}
 	else if (GetAsyncKeyState('S'))
 	{
-		camera.posZ += camera.speed*.05f;
+		camera.posZ += camera.speed*.2f;
 	}
 	if (GetAsyncKeyState('D'))
 	{
-		camera.posX -= camera.speed *.05f;
+		camera.posX -= camera.speed *.2f;
 	}
 	else if (GetAsyncKeyState('A'))
 	{
-		camera.posX += camera.speed*.05f;
+		camera.posX += camera.speed*.2f;
 	}
 
 	//Roll, Pitch, Yaw
 	if (GetAsyncKeyState('Q'))
 	{
-		camera.roll -= camera.speed*.005f;
+		camera.roll -= camera.speed*.01f;
 	}
 	else if (GetAsyncKeyState('E'))
 	{
-		camera.roll += camera.speed*.005f;
+		camera.roll += camera.speed*.01f;
 	}
 
 	if (GetAsyncKeyState(VK_UP))
 	{
-		camera.pitch += camera.speed*.005f;
+		camera.pitch += camera.speed*.01f;
 	}
 	else if (GetAsyncKeyState(VK_DOWN))
 	{
-		camera.pitch -= camera.speed*.005f;
+		camera.pitch -= camera.speed*.01f;
 	}
 
 	if (GetAsyncKeyState(VK_RIGHT))
 	{
-		camera.yaw += camera.speed*.005f;
+		camera.yaw += camera.speed*.01f;
 	}
 	else if (GetAsyncKeyState(VK_LEFT))
 	{
-		camera.yaw -= camera.speed*.005f;
+		camera.yaw -= camera.speed*.01f;
 	}
 
 	//////////  Controls for Lights ( 1: Point, 2: Spot, etc.)
-	if (GetAsyncKeyState('1'))
+	if (GetAsyncKeyState('8'))
 	{
 		camera.lightControl = 1; 
 	}
-	if (GetAsyncKeyState('2'))
+	if (GetAsyncKeyState('9'))
 	{
 		camera.lightControl = 2; 
 	}
@@ -823,11 +1474,12 @@ void LetsDrawSomeStuff::MoveCamera()
 		switch (camera.lightControl)
 		{
 		case 1: 
-			pointPos.z -= 0.05f * camera.speed;
+			pointPos.z -= 0.1f * camera.speed;
+			pointMat *= XMMatrixTranslation(0.0f, 0.0f, -0.1f * camera.speed); 
 			break; 
 		case 2: 
-			spotPos.z -= 0.05f  * camera.speed;
-			spotMat *= XMMatrixTranslation(0.0f, 0.0f, -0.05f * camera.speed);
+			spotPos.z -= 0.1f  * camera.speed;
+			spotMat *= XMMatrixTranslation(0.0f, 0.0f, -0.1f * camera.speed);
 			break; 
 		default:
 			break;
@@ -838,11 +1490,12 @@ void LetsDrawSomeStuff::MoveCamera()
 		switch (camera.lightControl)
 		{
 		case 1:
-			pointPos.z += 0.05f* camera.speed;
+			pointPos.z += 0.1f* camera.speed;
+			pointMat *= XMMatrixTranslation(0.0f, 0.0f, 0.1f *camera.speed);
 			break;
 		case 2:
-			spotPos.z += 0.05f * camera.speed;
-			spotMat *= XMMatrixTranslation(0.0f, 0.0f, 0.05f *camera.speed);
+			spotPos.z += 0.1f * camera.speed;
+			spotMat *= XMMatrixTranslation(0.0f, 0.0f, 0.1f *camera.speed);
 			break;
 		default:
 			break;
@@ -853,11 +1506,12 @@ void LetsDrawSomeStuff::MoveCamera()
 		switch (camera.lightControl)
 		{
 		case 1:
-			pointPos.x += 0.05f* camera.speed;
+			pointPos.x += 0.1f* camera.speed;
+			pointMat *= XMMatrixTranslation(0.1f * camera.speed, 0.0f, 0.0f);
 			break;
 		case 2:
-			spotPos.x += 0.05f * camera.speed;
-			spotMat *= XMMatrixTranslation(0.05f * camera.speed, 0.0f, 0.0f);
+			spotPos.x += 0.1f * camera.speed;
+			spotMat *= XMMatrixTranslation(0.1f * camera.speed, 0.0f, 0.0f);
 			break;
 		default:
 			break;
@@ -868,11 +1522,12 @@ void LetsDrawSomeStuff::MoveCamera()
 		switch (camera.lightControl)
 		{
 		case 1:
-			pointPos.x -= 0.05f * camera.speed;
+			pointPos.x -= 0.1f * camera.speed;
+			pointMat *= XMMatrixTranslation(-0.1f * camera.speed, 0.0f, 0.0f);
 			break;
 		case 2:
-			spotPos.x -= 0.05f  * camera.speed;
-			spotMat *= XMMatrixTranslation(-0.05f * camera.speed, 0.0f, 0.0f);
+			spotPos.x -= 0.1f  * camera.speed;
+			spotMat *= XMMatrixTranslation(-0.1f * camera.speed, 0.0f, 0.0f);
 			break;
 		default:
 			break;
@@ -883,11 +1538,12 @@ void LetsDrawSomeStuff::MoveCamera()
 		switch (camera.lightControl)
 		{
 		case 1:
-			pointPos.y += 0.05f * camera.speed;
+			pointPos.y += 0.1f * camera.speed;
+			pointMat *= XMMatrixTranslation(0.0f, 0.1f * camera.speed, 0.0f);
 			break;
 		case 2:
-			spotPos.y += 0.05f  * camera.speed;
-			spotMat *= XMMatrixTranslation(0.0f, 0.05f * camera.speed, 0.0f);
+			spotPos.y += 0.1f  * camera.speed;
+			spotMat *= XMMatrixTranslation(0.0f, 0.1f * camera.speed, 0.0f);
 			break;
 		default:
 			break;
@@ -898,16 +1554,33 @@ void LetsDrawSomeStuff::MoveCamera()
 		switch (camera.lightControl)
 		{
 		case 1:
-			pointPos.y -= 0.05f * camera.speed;
+			pointPos.y -= 0.1f * camera.speed;
+			pointMat *= XMMatrixTranslation(0.0f, -0.1f * camera.speed, 0.0f);
 			break;
 		case 2:
-			spotPos.y -= 0.05f  * camera.speed;
-			spotMat *= XMMatrixTranslation(0.0f, -0.05f * camera.speed, 0.0f);
+			spotPos.y -= 0.1f  * camera.speed;
+			spotMat *= XMMatrixTranslation(0.0f, -0.1f * camera.speed, 0.0f);
 			break;
 		default:
 			break;
 		}
 	}
+								
+	if (GetAsyncKeyState('5')) //cubesOn = !cubesOn; this doesn't work efficientyly, too many passes. 
+	{
+		cubesOn = false; 
+	}
+	if (GetAsyncKeyState('6'))
+	{
+		cubesOn = true;
+	}
+	//if (GetAsyncKeyState('0')) // TODO : Light Rotations OR TOGGLE FOLLOW
+	//{
+	//	//Quaternion rotation = Quaternion.Euler(x, y, z);
+	//	//Vector3 myVector = Vector3.one;
+	//	//Vector3 rotateVector = rotation * myVector;
+	//	//spotMat *= XMMatrixRotationZ(-0.01f * camera.speed); 
+	//}
 
 	// Near/Far Plane and Zoom adjustments
 	if (GetAsyncKeyState('Z'))
@@ -940,6 +1613,15 @@ void LetsDrawSomeStuff::MoveCamera()
 		camera.camZoom += 0.001f;
 	}
 
+	if (GetAsyncKeyState('1'))
+	{
+		scene = 1; //Monty Python Theme
+	}
+	if (GetAsyncKeyState('2'))
+	{
+		scene = 2; //Custom Theme
+	}
+
 	// Update Camera
 	viewMat = XMMatrixInverse(nullptr, viewMat);
 	viewMat = XMMatrixTranslationFromVector(XMVECTOR{ 0,0, camera.posZ})*viewMat;
@@ -965,7 +1647,7 @@ void LetsDrawSomeStuff::MoveCamera()
 
 	projectionMat = XMMatrixPerspectiveFovRH(XMConvertToRadians(65)/camera.camZoom, mySurface->GetAspectRatio(aspectR), camera.nearPlane, camera.farPlane);
 
-	//aspectR = 0; 
+	//Reset Values
 	camera.posX = 0; 
 	camera.posZ = 0;
 	camera.yaw = 0; 
@@ -974,3 +1656,4 @@ void LetsDrawSomeStuff::MoveCamera()
 	camera.pitch = 0; 
 	camera.speed = 0.5f; 
 }
+

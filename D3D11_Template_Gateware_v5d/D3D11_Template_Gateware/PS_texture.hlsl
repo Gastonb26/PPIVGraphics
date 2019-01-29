@@ -4,7 +4,6 @@
 // 2. Input Layout
 // 3. HLSL Vertex Struct
 
-
 Texture2D txDiffuse : register(t0);
 SamplerState samLinear : register(s0);
 
@@ -27,13 +26,11 @@ struct VS_INPUT
 
 struct PS_INPUT
 {
-	float4 Pos : SV_POSITION; // system value
+	float4 Pos : SV_POSITION;
 	float3 Norm : NORMAL;
 	float3 Tex : TEXCOORD0; 
 	float4 WorldPosition : POSITION;
 };
-
-//}
 
 float4 PS(PS_INPUT input) : SV_Target
 {

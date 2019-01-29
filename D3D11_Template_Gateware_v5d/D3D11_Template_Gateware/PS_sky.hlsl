@@ -33,7 +33,6 @@ struct PS_INPUT
 	float4 WorldPosition : POSITION;
 };
 
-
 float4 PS(PS_INPUT input) : SV_Target
 {
 	return skyTex.Sample(samLinear ,input.Tex);

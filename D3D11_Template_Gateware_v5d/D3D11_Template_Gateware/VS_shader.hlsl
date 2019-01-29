@@ -16,8 +16,10 @@ cbuffer ConstantBuffer : register (b0)
 	float4 vLightColor[2];
 	float4 vOutputCol;
 	float3 lightPos;
-	float pad;
+	float pointIntensity;
 	float3 spotPos;
+	float spotIntensity;
+	float4 spotCol;
 }
 
 struct VS_INPUT

@@ -4,7 +4,6 @@
 // 2. Input Layout
 // 3. HLSL Vertex Struct
 
-
 //Texture2D txDiffuse : register(t0);
 //SamplerState samLinear : register(s0);
 
@@ -47,8 +46,9 @@ float4 PS(PS_INPUT input) : SV_Target
 	finalColor.a = 1;
 	return finalColor;
 }
-
+//
 //float4 PS(VS_INPUT input) : SV_Target
 //{
 //	
 //	return vOutputCol;
+//}
