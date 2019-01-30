@@ -25,7 +25,7 @@
 #include "Grail.h"
 #include "holyGrail.h"
 #include "Knight.h"
-#include "HHG3D.h"
+
 #include "cloud.h"
 #include "sephiroth.h"
 #include "aerith.h"
@@ -469,38 +469,38 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 
 			//////////////////////////////// HOLY HAND //////////////////////////////////////
 
-			myVertex* tempholyhandV = new myVertex[6382];
-			for (int i = 0; i < 6382; i++)
+			myVertex* tempholyhandV = new myVertex[1255];
+			for (int i = 0; i < 1255; i++)
 			{
-				tempholyhandV[i].Position.x = HHG3D_data[i].pos[0];
-				tempholyhandV[i].Position.y = HHG3D_data[i].pos[1];
-				tempholyhandV[i].Position.z = HHG3D_data[i].pos[2];
+				tempholyhandV[i].Position.x = holyhand_data[i].pos[0];
+				tempholyhandV[i].Position.y = holyhand_data[i].pos[1];
+				tempholyhandV[i].Position.z = holyhand_data[i].pos[2];
 				
-				tempholyhandV[i].Normal.x = HHG3D_data[i].nrm[0];
-				tempholyhandV[i].Normal.y = HHG3D_data[i].nrm[1];
-				tempholyhandV[i].Normal.z = HHG3D_data[i].nrm[2];
+				tempholyhandV[i].Normal.x = holyhand_data[i].nrm[0];
+				tempholyhandV[i].Normal.y = holyhand_data[i].nrm[1];
+				tempholyhandV[i].Normal.z = holyhand_data[i].nrm[2];
 				
-				tempholyhandV[i].Tex.x = HHG3D_data[i].uvw[0];
-				tempholyhandV[i].Tex.y = HHG3D_data[i].uvw[1];
+				tempholyhandV[i].Tex.x = holyhand_data[i].uvw[0];
+				tempholyhandV[i].Tex.y = holyhand_data[i].uvw[1];
 			}
 
 			bDesc.Usage = D3D11_USAGE_DEFAULT;
 			bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-			bDesc.ByteWidth = sizeof(myVertex) * 6382;
+			bDesc.ByteWidth = sizeof(myVertex) * 1255;
 			bDesc.CPUAccessFlags = 0;
 
 			subData.pSysMem = tempholyhandV;
 
 			myDevice->CreateBuffer(&bDesc, &subData, &holyhandVB);
 
-			WORD* tempholyhandI = new WORD[22674];
-			for (int i = 0; i < 22674; i++)
+			WORD* tempholyhandI = new WORD[4032];
+			for (int i = 0; i < 4032; i++)
 			{
-				tempholyhandI[i] = HHG3D_indicies[i];
+				tempholyhandI[i] = holyhand_indicies[i];
 			}
 			bDesc.Usage = D3D11_USAGE_DEFAULT;
 			bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-			bDesc.ByteWidth = sizeof(WORD) * 22674;
+			bDesc.ByteWidth = sizeof(WORD) * 4032;
 			bDesc.CPUAccessFlags = 0;
 			subData.pSysMem = tempholyhandI;
 
@@ -1038,29 +1038,6 @@ void LetsDrawSomeStuff::Render()
 				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
 				myContext->DrawIndexed(3420, 0, 0);
 
-				///////////////////////////////////////////HOLY HAND GRENADE // Not working
-
-				//scale = XMMatrixScaling(1.0f, 1.0f, 1.0f);
-				////trans = XMMatrixTranslation(0.0f, 0.0f, 0.0f);
-				////rot = XMMatrixRotationY(0f);
-
-				//constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale);//* rot * trans);
-				//constBuffer.mView = XMMatrixTranspose(viewMat);
-				//constBuffer.mProjection = XMMatrixTranspose(projectionMat);
-
-				//myContext->IASetVertexBuffers(0, 1, &tempBuffer[4], &stride, &offset);
-				//myContext->IASetIndexBuffer(holyhandIB, DXGI_FORMAT_R16_UINT, 0);
-
-				//myContext->PSSetShaderResources(0, 1, &textureResource);
-
-				//myContext->PSSetShader(myTextureShader, 0, 0);
-				//myContext->VSSetShader(myVertexShader, 0, 0);
-
-				//myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
-				//myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
-
-				//myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
-				//myContext->DrawIndexed(22674, 0, 0);
 
 				///////////////////////////////////////////HOLY GRAIL
 
@@ -1326,9 +1303,11 @@ void LetsDrawSomeStuff::Render()
 			if (scene == 1)
 			{
 
-				scale = XMMatrixScaling(1 / 5.0f, 1 / 5.0f, 1 / 5.0f);
-				rot = XMMatrixRotationZ(60.0f);
-				constBuffer.mWorld = XMMatrixTranspose(worldMat * XMMatrixRotationY(t) * scale * renderCubeIn * rot);
+				///////////////////////////////////////////HOLY HAND GRENADE
+
+				scale = XMMatrixScaling(4.0f, 4.0f,4.0f);
+
+				constBuffer.mWorld = XMMatrixTranspose(XMMatrixRotationX(XMConvertToRadians(180.0f)) * worldMat * XMMatrixRotationY(t) * scale * renderCubeIn);
 				constBuffer.mView = XMMatrixTranspose(viewMat);
 				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
 
@@ -1336,8 +1315,8 @@ void LetsDrawSomeStuff::Render()
 
 				myContext->PSSetShaderResources(0, 1, &textureResource);
 
-				myContext->IASetVertexBuffers(0, 1, &tempBuffer[5], &stride, &offset);
-				myContext->IASetIndexBuffer(metaIB, DXGI_FORMAT_R16_UINT, 0);
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[3], &stride, &offset);
+				myContext->IASetIndexBuffer(holyhandIB, DXGI_FORMAT_R16_UINT, 0);
 
 				//myContext->VSSetShader(myVertexShader, 0, 0);
 				myContext->PSSetShader(myPixelShader, 0, 0);
@@ -1347,7 +1326,30 @@ void LetsDrawSomeStuff::Render()
 
 				myContext->PSSetSamplers(0, 1, &samplerState);
 				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
-				myContext->DrawIndexed(22242, 0, 0);
+				myContext->DrawIndexed(4032, 0, 0);
+
+				//scale = XMMatrixScaling(1 / 5.0f, 1 / 5.0f, 1 / 5.0f);
+				//rot = XMMatrixRotationZ(60.0f);
+				//constBuffer.mWorld = XMMatrixTranspose(worldMat * XMMatrixRotationY(t) * scale * renderCubeIn * rot);
+				//constBuffer.mView = XMMatrixTranspose(viewMat);
+				//constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+
+				//constBuffer.vOutputCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+
+				//myContext->PSSetShaderResources(0, 1, &textureResource);
+
+				//myContext->IASetVertexBuffers(0, 1, &tempBuffer[5], &stride, &offset);
+				//myContext->IASetIndexBuffer(metaIB, DXGI_FORMAT_R16_UINT, 0);
+
+				////myContext->VSSetShader(myVertexShader, 0, 0);
+				//myContext->PSSetShader(myPixelShader, 0, 0);
+
+				//myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				//myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+				//myContext->PSSetSamplers(0, 1, &samplerState);
+				//myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				//myContext->DrawIndexed(22242, 0, 0);
 			}
 			else
 			{
