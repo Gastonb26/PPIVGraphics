@@ -1357,7 +1357,7 @@ void LetsDrawSomeStuff::Render()
 				//constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * XMMatrixRotationY(XMConvertToRadians(90.0f)) * rot * trans);
 
 				scale = XMMatrixScaling(.05f, .05f, .05f);
-				trans = XMMatrixTranslation(0.0, 10.0, 38.0f); 
+				trans = XMMatrixTranslation(0.0, 10.0, 40.0f); 
 				///rot = XMMatrixRotationX(XMConvertToRadians(180.0f));
 
 
