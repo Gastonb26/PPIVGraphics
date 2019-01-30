@@ -2,44 +2,42 @@
 
 Camera Movement Controls: 
 
-W/S/A/D ------> forward, back, left, right
+W/S/A/D ---------> forward, back, left, right
 
 ARROW KEYS ------> yaw and pitch
 
-Q/E ------> roll
+Q/E -------------> roll
 
-Camera Zoom: 
+Camera Zoom & FOV: 
 
-T/Y ------> zoom -/+
+T/Y -------------> zoom -/+
 
-Camera FOV: 
+Z/X -------------> adjust near plane -/+
 
-Z/X ------> adjust near plane -/+
-
-N/M ------> adjust far plane -/+
+C/V -------------> adjust far plane -/+
 
 Change Themes/Scenes: 
 
-1 ------> Render Monty Python Scene
+1 ---------------> Render Monty Python Scene
 
-2 ------> Render Custom Scene (FFVII) 
+2 ---------------> Render Custom Scene (FFVII) 
 
-Light Control Selection: 
+Light Control & Movement: 
 
-8 ------> PointLight 
+8 ---------------> control Point Light 
 
-9 ------> Spot Light
+9 ---------------> control Spot Light
 
-Light Control: 
+I/K/J/L ---------> move on x/z axis
 
-I K J L ------> move on x/z axis
+O/U -------------> move up and down on y axis
 
-U O ------> move up and down on y axis
+N/M -------------> rotate light (SPOT LIGHT ONLY) 
 
-Toggle Light Indicators (cubes to know where lights are located): 
+Toggle Light Indicators: (cubes to know where lights are located): 
 
-5 ------> off
+5 ---------------> off
 
-6 ------> on
+6 ---------------> on
 
 
