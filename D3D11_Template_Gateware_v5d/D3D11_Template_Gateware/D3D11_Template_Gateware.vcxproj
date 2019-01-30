@@ -115,6 +115,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="aerith.h" />
     <ClInclude Include="cloud.h" />
     <ClInclude Include="DDSTextureLoader.h" />
     <ClInclude Include="FitMetaknight00.h" />

@@ -28,6 +28,7 @@
 #include "HHG3D.h"
 #include "cloud.h"
 #include "sephiroth.h"
+#include "aerith.h"
 
 
 using namespace DirectX;
@@ -55,6 +56,8 @@ class LetsDrawSomeStuff
 		XMFLOAT3 spotLight;
 		float spotIntensity; 
 		XMFLOAT4 spotCol; 
+		XMFLOAT3 spotDirection;
+
 	};
 
 	struct CamInfo
@@ -131,6 +134,9 @@ class LetsDrawSomeStuff
 	ID3D11Buffer *sephirothVB = nullptr; 
 	ID3D11Buffer *sephirothIB = nullptr; 
 	
+	ID3D11Buffer *aerithVB = nullptr;
+	ID3D11Buffer *aerithIB = nullptr;
+
 	// MATRICES
 	XMMATRIX worldMat; 
 	XMMATRIX viewMat;
@@ -141,7 +147,7 @@ class LetsDrawSomeStuff
 	XMMATRIX rot;
 	
 	XMMATRIX skyMat = XMMatrixTranslation(0.0f, 10.0f, 5.0f);
-	XMMATRIX spotMat = XMMatrixTranslation(5.0f, 0.0f, 0.0f);
+	XMMATRIX spotMat = XMMatrixTranslation(10.0f, 1.0f, 30.0f);
 	XMMATRIX pointMat = XMMatrixTranslation(0.0f, 0.0f, -5.0f); 
 	XMMATRIX grailMat = XMMatrixIdentity(); 
 
@@ -149,11 +155,12 @@ class LetsDrawSomeStuff
 	
 	// RENDER TO TEXTURE CUBE
 	XMMATRIX renderCube = XMMatrixTranslation(0.0f, 0.0f, 25.0f);
-	XMMATRIX renderCubeIn = XMMatrixTranslation(.0f, 0.0f, 30.0f);
+	XMMATRIX renderCubeIn = XMMatrixTranslation(0.0f, 0.0f, 30.0f);
 		
 	// POSTIONS
 	XMFLOAT3 pointPos = XMFLOAT3(0.0f, 0.0f, -5.0f);
-	XMFLOAT3 spotPos = XMFLOAT3(5.0f, 0.0f, 0.0f);
+	XMFLOAT3 spotPos = XMFLOAT3(10.0f, 1.0f, 30.0f);
+	XMFLOAT3 spotDir = XMFLOAT3(0.0f, -2.0f, -10.0f);
 
 	// TEXTURES
 	ID3D11ShaderResourceView *textureResource = nullptr; //simple fake looking metal (used for meta knight
@@ -219,6 +226,7 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			};
+
 
 			UINT numberOfElements = ARRAYSIZE(vLayout); 
 			myDevice->CreateInputLayout(vLayout, numberOfElements, VS_shader, sizeof(VS_shader), &inputLayout);
@@ -653,6 +661,45 @@ LetsDrawSomeStuff::LetsDrawSomeStuff(GW::SYSTEM::GWindow* attatchPoint)
 
 			myDevice->CreateBuffer(&bDesc, &subData, &sephirothIB);
 
+			//////////////////////////////// aerith /////////////////////////////////
+
+			myVertex* aV = new myVertex[6665];
+			for (int i = 0; i < 6665; i++)
+			{					  
+				aV[i].Position.x = aerith_data[i].pos[0];
+				aV[i].Position.y = aerith_data[i].pos[1];
+				aV[i].Position.z = aerith_data[i].pos[2];
+				 
+				aV[i].Normal.x = aerith_data[i].nrm[0];
+				aV[i].Normal.y = aerith_data[i].nrm[1];
+				aV[i].Normal.z = aerith_data[i].nrm[2];
+				
+				aV[i].Tex.x = aerith_data[i].uvw[0];
+				aV[i].Tex.y = aerith_data[i].uvw[1];
+			}
+
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			bDesc.ByteWidth = sizeof(myVertex) * 6665;
+			bDesc.CPUAccessFlags = 0;
+
+			subData.pSysMem = aV;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &aerithVB);
+
+			WORD* aI = new WORD[7569];
+			for (int i = 0; i < 7569; i++)
+			{
+				aI[i] = aerith_indicies[i];
+			}
+			bDesc.Usage = D3D11_USAGE_DEFAULT;
+			bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+			bDesc.ByteWidth = sizeof(WORD) * 7569;
+			bDesc.CPUAccessFlags = 0;
+			subData.pSysMem = aI;
+
+			myDevice->CreateBuffer(&bDesc, &subData, &aerithIB);
+
 
 
 			//////////////////////////////////////////////////////////////////////////////////////////////
@@ -900,8 +947,8 @@ void LetsDrawSomeStuff::Render()
 
 			UINT stride = sizeof(myVertex);
 			UINT offset = 0;
-												//0			  //1		  //2		   //3			//4		  //5			//6				//7			//8
-			ID3D11Buffer *tempBuffer[] = { {vertexBuffer}, {knightVB}, {rabbitVB}, {holyhandVB}, {grailVB}, {metaVB}, {skyVertexBuffer}, {cloudVB}, {sephirothVB} };
+												//0			  //1		  //2		   //3			//4		  //5			//6				//7			//8				//9
+			ID3D11Buffer *tempBuffer[] = { {vertexBuffer}, {knightVB}, {rabbitVB}, {holyhandVB}, {grailVB}, {metaVB}, {skyVertexBuffer}, {cloudVB}, {sephirothVB}, {aerithVB} };
 
 			//Camera Movement & Controls
 			MoveCamera(); 
@@ -933,9 +980,11 @@ void LetsDrawSomeStuff::Render()
 			
 			constBuffer.pointLight = pointPos;
 			constBuffer.spotLight = spotPos;
+			constBuffer.spotDirection = spotDir;
 
 			if (scene == 1) // RENDER MONTY PYTHON THEME
 			{
+
 
 				constBuffer.pointIntensity = 5.0f;
 				constBuffer.spotIntensity = 1.0f;
@@ -956,7 +1005,7 @@ void LetsDrawSomeStuff::Render()
 
 				myContext->PSSetShaderResources(0, 1, &knightTex);
 
-				myContext->PSSetShader(myTextureShader, 0, 0);
+				myContext->PSSetShader(myPointShader , 0, 0);
 				myContext->VSSetShader(myVertexShader, 0, 0);
 
 				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
@@ -988,29 +1037,29 @@ void LetsDrawSomeStuff::Render()
 				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
 				myContext->DrawIndexed(3420, 0, 0);
 
-				///////////////////////////////////////////HOLY HAND GRENADE
+				///////////////////////////////////////////HOLY HAND GRENADE // Not working
 
-				scale = XMMatrixScaling(1.0f, 1.0f, 1.0f);
-				//trans = XMMatrixTranslation(0.0f, 0.0f, 0.0f);
-				//rot = XMMatrixRotationY(0f);
+				//scale = XMMatrixScaling(1.0f, 1.0f, 1.0f);
+				////trans = XMMatrixTranslation(0.0f, 0.0f, 0.0f);
+				////rot = XMMatrixRotationY(0f);
 
-				constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale);//* rot * trans);
-				constBuffer.mView = XMMatrixTranspose(viewMat);
-				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+				//constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale);//* rot * trans);
+				//constBuffer.mView = XMMatrixTranspose(viewMat);
+				//constBuffer.mProjection = XMMatrixTranspose(projectionMat);
 
-				myContext->IASetVertexBuffers(0, 1, &tempBuffer[4], &stride, &offset);
-				myContext->IASetIndexBuffer(holyhandIB, DXGI_FORMAT_R16_UINT, 0);
+				//myContext->IASetVertexBuffers(0, 1, &tempBuffer[4], &stride, &offset);
+				//myContext->IASetIndexBuffer(holyhandIB, DXGI_FORMAT_R16_UINT, 0);
 
-				myContext->PSSetShaderResources(0, 1, &textureResource);
+				//myContext->PSSetShaderResources(0, 1, &textureResource);
 
-				myContext->PSSetShader(myTextureShader, 0, 0);
-				myContext->VSSetShader(myVertexShader, 0, 0);
+				//myContext->PSSetShader(myTextureShader, 0, 0);
+				//myContext->VSSetShader(myVertexShader, 0, 0);
 
-				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
-				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+				//myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				//myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
 
-				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
-				myContext->DrawIndexed(22674, 0, 0);
+				//myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				//myContext->DrawIndexed(22674, 0, 0);
 
 				///////////////////////////////////////////HOLY GRAIL
 
@@ -1067,12 +1116,19 @@ void LetsDrawSomeStuff::Render()
 			else // RENDER CUSTOM THEME (Final Fantasy VII) 
 			{
 
+				// set color and intensity for models 
+				
+				constBuffer.pointIntensity = 5.0f;
+				constBuffer.spotIntensity = 20.0f;
+				constBuffer.vOutputCol = XMFLOAT4(.35f, .92f, .49f, 1.0f); // 90, 232, 125
+				constBuffer.spotCol = XMFLOAT4(.90f, .27f, .26f, 1.0f); // 232, 70, 67)
+
 				/////////////////////// CLOUD 
 				scale = XMMatrixScaling(.05f, .05f, .05f);
 				rot = XMMatrixRotationX(XMConvertToRadians(180.0f));
-				trans = XMMatrixTranslation(-5.0f, 0.0f, 0.0f);
+				trans = XMMatrixTranslation(-15.0f, -5.0f, 0.0f);
 
-				constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * rot * trans);
+				constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * XMMatrixRotationY(XMConvertToRadians(90.0f)) * rot * trans);
 				constBuffer.mView = XMMatrixTranspose(viewMat);
 				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
 
@@ -1091,12 +1147,12 @@ void LetsDrawSomeStuff::Render()
 				myContext->DrawIndexed(8553, 0, 0);
 
 
-				/////////////////////// Sephiroth
+				////////////////////////////// Sephiroth
 				scale = XMMatrixScaling(.05f, .05f, .05f);
 				rot = XMMatrixRotationX(XMConvertToRadians(180.0f));
-				trans = XMMatrixTranslation(5.0f, 0.0f, 0.0f); 
+				trans = XMMatrixTranslation(15.0f, -5.0f, 0.0f); 
 
-				constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * rot * trans );
+				constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * XMMatrixRotationY(XMConvertToRadians(-90.0f)) * rot * trans );
 				constBuffer.mView = XMMatrixTranspose(viewMat);
 				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
 
@@ -1114,122 +1170,32 @@ void LetsDrawSomeStuff::Render()
 				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
 				myContext->DrawIndexed(7128, 0, 0);
 
-				//////////////////////////////////////////////
-				// Rotate cube around the origin
-				//worldMat = XMMatrixRotationY(t);
-				worldMat = XMMatrixIdentity();
-				XMFLOAT4 vLightDirs[2] =
-				{
-					XMFLOAT4(-0.577f, 0.577f, -0.577f, 1.0f),
-					XMFLOAT4(0.0f, 0.0f, -1.0f, 1.0f),
-				};
-				XMFLOAT4 vLightColors[2] =
-				{
-					XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f),
-					XMFLOAT4(0.5f, 0.0f, 0.0f, 1.0f)
-				};
-				XMMATRIX mRotate = XMMatrixRotationY(-2.0f * t);
-				XMVECTOR vLightDir = XMLoadFloat4(&vLightDirs[1]);
-				vLightDir = XMVector3Transform(vLightDir, mRotate);
-				XMStoreFloat4(&vLightDirs[1], vLightDir);
+				/////////////////////////// Floor
 
-
-
-
-				//COPY PASE THIS BLOCK OF CODE FOR DRAWIN, JUST REMEMBER TO CHANGE VERTEX AND PIXEL SHADERS.
-				constBuffer.mWorld = XMMatrixTranspose(worldMat * XMMatrixRotationY(t));
-				constBuffer.mView = XMMatrixTranspose(viewMat);
-				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
-				constBuffer.vLightDir[0] = vLightDirs[0];
-				constBuffer.vLightDir[1] = vLightDirs[1];
-				constBuffer.vLightCol[0] = vLightColors[0];
-				constBuffer.vLightCol[1] = vLightColors[1];
-				constBuffer.vOutputCol = XMFLOAT4(1.0f, 0.0f, 0.0f, 0.0f);
-				myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
-				myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
-
-				//Vertex shader
-				myContext->PSSetShader(myPixelShader, 0, 0);
-				//Pixel Shader					
-				myContext->VSSetShader(myVertexShader, 0, 0);
-				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
-				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
-
-				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
-				myContext->DrawIndexed(36, 0, 0);
-				//STOP THE COPY PASTE.
-
-				///// UPDATE LIGHTS
-				for (int m = 0; m < 2; m++)
-				{
-
-					XMMATRIX mLight = XMMatrixTranslationFromVector(5.0f * XMLoadFloat4(&vLightDirs[m]));
-					XMMATRIX mLightScale = XMMatrixScaling(0.2f, 0.2f, 0.2f);
-					mLight = mLightScale * mLight;
-
-					// Update the world variable to reflect the current light
-					constBuffer.mWorld = XMMatrixTranspose(mLight);
-					constBuffer.vOutputCol = vLightColors[m];
-					myContext->PSSetShader(myPixelShader, NULL, 0);
-					myContext->UpdateSubresource(constantBuffer, 0, NULL, &constBuffer, 0, 0);
-					myContext->DrawIndexed(36, 0, 0);
-				}
-
-				////////////////////////// META
-
-				//constBuffer.vOutputCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-				scale = XMMatrixScaling(1 / 5.0f, 1 / 5.0f, 1 / 5.0f);
-
-				constBuffer.mWorld = XMMatrixTranspose(worldMat * scale * metaMat);
-				constBuffer.mView = XMMatrixTranspose(viewMat);
-				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
-
-				myContext->PSSetShaderResources(0, 1, &textureResource);
-
-				myContext->IASetVertexBuffers(0, 1, &tempBuffer[5], &stride, &offset);
-				myContext->IASetIndexBuffer(metaIB, DXGI_FORMAT_R16_UINT, 0);
-
-
-				myContext->PSSetShader(myPointShader, 0, 0); // THE LIGHT WILL AFFECT THE MODEL! :-)
-				myContext->VSSetShader(myVertexShader, 0, 0);
-
-				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
-				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
-
-				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
-				myContext->DrawIndexed(22242, 0, 0);
-
-
-				////////////////// AFTER MODELS REMEMBER TO TURN UP INTENSITY FOR FLOOR AND ETC.
-				constBuffer.spotIntensity = 30.0f;
-				constBuffer.vOutputCol = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-
-				///// EHHH use this for something below
-				//wconstBuffer.Intensity = 30.0f;
-
-				///////////////////////// Floor
-				//Update Matrices 
-				myContext->PSSetShaderResources(0, 1, &textureResource);
-				scale = XMMatrixScaling(30.0f, 0.05f, 30.0f);
+				scale = XMMatrixScaling(25.0f, 0.1f, 25.0f);
 				trans = XMMatrixTranslation(0.0f, -5.0f, 0.0f);
-				//Update Constant Buffer (matrices, colors, lights, and more); 
+
 				constBuffer.mWorld = XMMatrixTranspose(worldMat * scale * trans);
 				constBuffer.mView = XMMatrixTranspose(viewMat);
 				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
-				//Set InputLayouts
+				constBuffer.pointIntensity = 15.0f;
+				constBuffer.spotIntensity = 40.0f;
+				//constBuffer.vOutputCol = XMFLOAT4(.35f, .92f, .49f, 1.0f); // 90, 232, 125
+				//constBuffer.spotCol = XMFLOAT4(.90f, .27f, .26f, 1.0f); // 232, 70, 67)
+
 				myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
 				myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
-				//Set Shaders
+
+				myContext->PSSetShaderResources(0, 1, &textureResource);
+
 				myContext->PSSetShader(myPointShader, 0, 0);
 				myContext->VSSetShader(myVertexShader, 0, 0);
-				//Set Buffers
+
 				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
 				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
-				//Update subresources and Draw
-				//myContext->PSSetShaderResources(0, 1, &textureResource);
+
 				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
 				myContext->DrawIndexed(36, 0, 0);
-				//STOP THE COPY PASTE.
 
 			}
 
@@ -1307,68 +1273,121 @@ void LetsDrawSomeStuff::Render()
 			///////////////////////////////////// RENDER TEXTURE TO CUBE ///////////////////////////////
 			////////////////////////////////////////////////////////////////////////////////////////////
 
+			////////////////////////////// SET UP AMBIENT LIGHTS FOR RENDER TO TEXTURE 
+
+			XMFLOAT4 vLightDirs[2] =
+			{
+				XMFLOAT4(-0.577f, 0.577f, -0.577f, 1.0f),
+				XMFLOAT4(0.0f, 0.0f, -1.0f, 1.0f),
+			};
+			XMFLOAT4 vLightColors[2] =
+			{
+				XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f),
+				XMFLOAT4(0.5f, 0.0f, 0.0f, 1.0f)
+			};
+			XMMATRIX mRotate = XMMatrixRotationY(-2.0f * t);
+			XMVECTOR vLightDir = XMLoadFloat4(&vLightDirs[1]);
+			vLightDir = XMVector3Transform(vLightDir, mRotate);
+			XMStoreFloat4(&vLightDirs[1], vLightDir);
+			constBuffer.vLightDir[0] = vLightDirs[0];
+			constBuffer.vLightDir[1] = vLightDirs[1];
+			constBuffer.vLightCol[0] = vLightColors[0];
+			constBuffer.vLightCol[1] = vLightColors[1];
+			constBuffer.vOutputCol = XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f);
+			///// UPDATE LIGHTS
+			for (int m = 0; m < 2; m++)
+			{
+
+				XMMATRIX mLight = XMMatrixTranslationFromVector(5.0f * XMLoadFloat4(&vLightDirs[m]));
+				XMMATRIX mLightScale = XMMatrixScaling(0.2f, 0.2f, 0.2f);
+				mLight = mLightScale * mLight;
+
+				// Update the world variable to reflect the current light
+				constBuffer.mWorld = XMMatrixTranspose(mLight);
+				constBuffer.vOutputCol = vLightColors[m];
+				myContext->PSSetShader(myPixelShader, NULL, 0);
+
+			}
+			////////////////////////////////////////////////////////////////////////////////
+
 			myContext->OMSetRenderTargets(1, &renderTargetViewMap, myDepthStencilView);
-			myContext->ClearRenderTargetView(renderTargetViewMap, DirectX::Colors::Green);
+			if (scene == 1)
+			{
+				myContext->ClearRenderTargetView(renderTargetViewMap, DirectX::Colors::BlanchedAlmond);
+			}
+			else
+			{
+				myContext->ClearRenderTargetView(renderTargetViewMap, DirectX::Colors::MediumSeaGreen);
+			}
 
 			////////////////////////What will be textured onto the surface goes below 
 
+			if (scene == 1)
+			{
 
-			scale = XMMatrixScaling(1 / 5.0f, 1 / 5.0f, 1 / 5.0f);
-			rot = XMMatrixRotationZ(60.0f); 
-			constBuffer.mWorld = XMMatrixTranspose(worldMat * XMMatrixRotationY(t) * scale * renderCubeIn * rot);
-			constBuffer.mView = XMMatrixTranspose(viewMat);
-			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+				scale = XMMatrixScaling(1 / 5.0f, 1 / 5.0f, 1 / 5.0f);
+				rot = XMMatrixRotationZ(60.0f);
+				constBuffer.mWorld = XMMatrixTranspose(worldMat * XMMatrixRotationY(t) * scale * renderCubeIn * rot);
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
 
-			constBuffer.vOutputCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-			
-			myContext->PSSetShaderResources(0, 1, &textureResource);
+				constBuffer.vOutputCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 
-			myContext->IASetVertexBuffers(0, 1, &tempBuffer[5], &stride, &offset);
-			myContext->IASetIndexBuffer(metaIB, DXGI_FORMAT_R16_UINT, 0);
+				myContext->PSSetShaderResources(0, 1, &textureResource);
 
-			//myContext->VSSetShader(myVertexShader, 0, 0);
-			myContext->PSSetShader(myPixelShader, 0, 0); 
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[5], &stride, &offset);
+				myContext->IASetIndexBuffer(metaIB, DXGI_FORMAT_R16_UINT, 0);
 
-			myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
-			myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
-			
-			myContext->PSSetSamplers(0, 1, &samplerState);
-			myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
-			myContext->DrawIndexed(22242, 0, 0);
+				//myContext->VSSetShader(myVertexShader, 0, 0);
+				myContext->PSSetShader(myPixelShader, 0, 0);
+
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+				myContext->PSSetSamplers(0, 1, &samplerState);
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				myContext->DrawIndexed(22242, 0, 0);
+			}
+			else
+			{
+				//scale = XMMatrixScaling(.05f, .05f, .05f);
+				//rot = XMMatrixRotationX(XMConvertToRadians(180.0f));
+				//trans = XMMatrixTranslation(-15.0f, -5.0f, 0.0f);
+				//constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity() * scale * XMMatrixRotationY(XMConvertToRadians(90.0f)) * rot * trans);
+
+				scale = XMMatrixScaling(.05f, .05f, .05f);
+				trans = XMMatrixTranslation(0.0, 10.0, 38.0f); 
+				///rot = XMMatrixRotationX(XMConvertToRadians(180.0f));
 
 
-			////////////////////////CUBE
-			//scale = XMMatrixScaling(5.0f, 5.0, 5.0f);
+				constBuffer.mWorld = XMMatrixTranspose(worldMat * XMMatrixRotationY(t) * scale * trans);
+				constBuffer.mView = XMMatrixTranspose(viewMat);
+				constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+				
+				constBuffer.vOutputCol = XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f);
 
-			//constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity()* scale * renderCube2);
-			//constBuffer.mView = XMMatrixTranspose(viewMat);
-			//constBuffer.mProjection = XMMatrixTranspose(projectionMat);
+				myContext->PSSetShaderResources(0, 1, &textureResource);
 
-			//constBuffer.vOutputCol = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-			//
-			//myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
-			//myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
-			//
-			////myContext->VSSetShader(myVertexShader, 0, 0);
-			//myContext->PSSetShader(myPixelShader, 0, 0);
-			//
-			//myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
-			//myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
-			//
-			//myContext->PSSetSamplers(0, 1, &samplerState);
-			//myContext->UpdateSubresource(constantBuffer, 0, NULL, &constBuffer, 0, 0);
-			//myContext->DrawIndexed(36, 0, 0);
-		
+				myContext->IASetVertexBuffers(0, 1, &tempBuffer[9], &stride, &offset);
+				myContext->IASetIndexBuffer(aerithIB, DXGI_FORMAT_R16_UINT, 0);
 
-			/////////////////////Surface that will have textures renders ONTO
+				myContext->PSSetShader(myPixelShader, 0, 0);
+
+				myContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+				myContext->PSSetConstantBuffers(0, 1, &constantBuffer);
+
+				myContext->PSSetSamplers(0, 1, &samplerState);
+				myContext->UpdateSubresource(constantBuffer, 0, nullptr, &constBuffer, 0, 0);
+				myContext->DrawIndexed(7569, 0, 0);
+			}
+	
+			///////////////////////////////////////////////Surface that will have textures renders ONTO
 			myContext->OMSetRenderTargets(1, targets, myDepthStencilView);
-
 			scale = XMMatrixScaling(5.0f, 5.0, 0.0f);
-
 			constBuffer.mWorld = XMMatrixTranspose(XMMatrixIdentity()* scale * renderCube);
 			constBuffer.mView = XMMatrixTranspose(viewMat);
 			constBuffer.mProjection = XMMatrixTranspose(projectionMat);
-			
+		
 			myContext->PSSetShaderResources(0, 1, &rttTexture);
 			myContext->IASetVertexBuffers(0, 1, &tempBuffer[0], &stride, &offset);
 			myContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
@@ -1379,11 +1398,10 @@ void LetsDrawSomeStuff::Render()
 			myContext->PSSetSamplers(0, 1, &samplerState);
 			myContext->DrawIndexed(36, 0, 0);
 
-			
-			
+	
 
 			//////////////////////////////////////////////////////////////////////////////////////////////
-			///////////////////////////////////SECTION 4: SwapChain & more ///////////////////////////////
+			///////////////////////////////////SECTION: SwapChain & more ///////////////////////////////
 			//////////////////////////////////////////////////////////////////////////////////////////////
 
 			////////////////////////////// UPDATE CAMERA //////////////////////////////////// 
@@ -1395,7 +1413,7 @@ void LetsDrawSomeStuff::Render()
 
 			// Present Backbuffer using Swapchain object
 			// Framerate is currently unlocked, we suggest "MSI Afterburner" to track your current FPS and memory usage.
-			mySwapChain->Present(0, 0); // set first argument to 1 to enable vertical refresh sync with display
+			mySwapChain->Present(1, 0); // set first argument to 1 to enable vertical refresh sync with display
 			
 			// Free any temp DX handles aquired this frame
 			myRenderTargetView->Release();
@@ -1416,47 +1434,47 @@ void LetsDrawSomeStuff::MoveCamera()
 	//MOVE Forward, Back, Left, Right
 	if (GetAsyncKeyState('W'))
 	{
-		camera.posZ -= camera.speed *.2f;
+		camera.posZ -= camera.speed *.5f;
 	}
 	else if (GetAsyncKeyState('S'))
 	{
-		camera.posZ += camera.speed*.2f;
+		camera.posZ += camera.speed*.5f;
 	}
 	if (GetAsyncKeyState('D'))
 	{
-		camera.posX -= camera.speed *.2f;
+		camera.posX -= camera.speed *.5f;
 	}
 	else if (GetAsyncKeyState('A'))
 	{
-		camera.posX += camera.speed*.2f;
+		camera.posX += camera.speed*.5f;
 	}
 
 	//Roll, Pitch, Yaw
 	if (GetAsyncKeyState('Q'))
 	{
-		camera.roll -= camera.speed*.01f;
+		camera.roll -= camera.speed*.05f;
 	}
 	else if (GetAsyncKeyState('E'))
 	{
-		camera.roll += camera.speed*.01f;
+		camera.roll += camera.speed*.05f;
 	}
 
 	if (GetAsyncKeyState(VK_UP))
 	{
-		camera.pitch += camera.speed*.01f;
+		camera.pitch += camera.speed*.05f;
 	}
 	else if (GetAsyncKeyState(VK_DOWN))
 	{
-		camera.pitch -= camera.speed*.01f;
+		camera.pitch -= camera.speed*.05f;
 	}
 
 	if (GetAsyncKeyState(VK_RIGHT))
 	{
-		camera.yaw += camera.speed*.01f;
+		camera.yaw += camera.speed*.05f;
 	}
 	else if (GetAsyncKeyState(VK_LEFT))
 	{
-		camera.yaw -= camera.speed*.01f;
+		camera.yaw -= camera.speed*.05f;
 	}
 
 	//////////  Controls for Lights ( 1: Point, 2: Spot, etc.)
@@ -1474,12 +1492,12 @@ void LetsDrawSomeStuff::MoveCamera()
 		switch (camera.lightControl)
 		{
 		case 1: 
-			pointPos.z -= 0.1f * camera.speed;
-			pointMat *= XMMatrixTranslation(0.0f, 0.0f, -0.1f * camera.speed); 
+			pointPos.z += 0.5f * camera.speed;
+			pointMat *= XMMatrixTranslation(0.0f, 0.0f, 0.5f * camera.speed); 
 			break; 
 		case 2: 
-			spotPos.z -= 0.1f  * camera.speed;
-			spotMat *= XMMatrixTranslation(0.0f, 0.0f, -0.1f * camera.speed);
+			spotPos.z += 0.5f  * camera.speed;
+			spotMat *= XMMatrixTranslation(0.0f, 0.0f, 0.5f * camera.speed);
 			break; 
 		default:
 			break;
@@ -1490,12 +1508,12 @@ void LetsDrawSomeStuff::MoveCamera()
 		switch (camera.lightControl)
 		{
 		case 1:
-			pointPos.z += 0.1f* camera.speed;
-			pointMat *= XMMatrixTranslation(0.0f, 0.0f, 0.1f *camera.speed);
+			pointPos.z -= 0.5f* camera.speed;
+			pointMat *= XMMatrixTranslation(0.0f, 0.0f, -0.5f *camera.speed);
 			break;
 		case 2:
-			spotPos.z += 0.1f * camera.speed;
-			spotMat *= XMMatrixTranslation(0.0f, 0.0f, 0.1f *camera.speed);
+			spotPos.z -= 0.5f * camera.speed;
+			spotMat *= XMMatrixTranslation(0.0f, 0.0f, -0.5f *camera.speed);
 			break;
 		default:
 			break;
@@ -1506,12 +1524,12 @@ void LetsDrawSomeStuff::MoveCamera()
 		switch (camera.lightControl)
 		{
 		case 1:
-			pointPos.x += 0.1f* camera.speed;
-			pointMat *= XMMatrixTranslation(0.1f * camera.speed, 0.0f, 0.0f);
+			pointPos.x -= 0.5f* camera.speed;
+			pointMat *= XMMatrixTranslation(-0.5f * camera.speed, 0.0f, 0.0f);
 			break;
 		case 2:
-			spotPos.x += 0.1f * camera.speed;
-			spotMat *= XMMatrixTranslation(0.1f * camera.speed, 0.0f, 0.0f);
+			spotPos.x -= 0.5f * camera.speed;
+			spotMat *= XMMatrixTranslation(-0.5f * camera.speed, 0.0f, 0.0f);
 			break;
 		default:
 			break;
@@ -1522,12 +1540,12 @@ void LetsDrawSomeStuff::MoveCamera()
 		switch (camera.lightControl)
 		{
 		case 1:
-			pointPos.x -= 0.1f * camera.speed;
-			pointMat *= XMMatrixTranslation(-0.1f * camera.speed, 0.0f, 0.0f);
+			pointPos.x += 0.5f * camera.speed;
+			pointMat *= XMMatrixTranslation(0.5f * camera.speed, 0.0f, 0.0f);
 			break;
 		case 2:
-			spotPos.x -= 0.1f  * camera.speed;
-			spotMat *= XMMatrixTranslation(-0.1f * camera.speed, 0.0f, 0.0f);
+			spotPos.x += 0.5f  * camera.speed;
+			spotMat *= XMMatrixTranslation(0.5f * camera.speed, 0.0f, 0.0f);
 			break;
 		default:
 			break;
@@ -1538,12 +1556,12 @@ void LetsDrawSomeStuff::MoveCamera()
 		switch (camera.lightControl)
 		{
 		case 1:
-			pointPos.y += 0.1f * camera.speed;
-			pointMat *= XMMatrixTranslation(0.0f, 0.1f * camera.speed, 0.0f);
+			pointPos.y -= 0.5f * camera.speed;
+			pointMat *= XMMatrixTranslation(0.0f, -0.5f * camera.speed, 0.0f);
 			break;
 		case 2:
-			spotPos.y += 0.1f  * camera.speed;
-			spotMat *= XMMatrixTranslation(0.0f, 0.1f * camera.speed, 0.0f);
+			spotPos.y -= 0.5f  * camera.speed;
+			spotMat *= XMMatrixTranslation(0.0f, -0.5f * camera.speed, 0.0f);
 			break;
 		default:
 			break;
@@ -1554,19 +1572,30 @@ void LetsDrawSomeStuff::MoveCamera()
 		switch (camera.lightControl)
 		{
 		case 1:
-			pointPos.y -= 0.1f * camera.speed;
-			pointMat *= XMMatrixTranslation(0.0f, -0.1f * camera.speed, 0.0f);
+			pointPos.y += 0.5f * camera.speed;
+			pointMat *= XMMatrixTranslation(0.0f, 0.5f * camera.speed, 0.0f);
 			break;
 		case 2:
-			spotPos.y -= 0.1f  * camera.speed;
-			spotMat *= XMMatrixTranslation(0.0f, -0.1f * camera.speed, 0.0f);
+			spotPos.y += 0.5f  * camera.speed;
+			spotMat *= XMMatrixTranslation(0.0f, 0.5f * camera.speed, 0.0f);
 			break;
 		default:
 			break;
 		}
 	}
+
+	//ROTATES SpotLight
+	if (GetAsyncKeyState('M'))
+	{
+		spotDir.x += 0.5 * camera.speed; 
+	}
+	else if (GetAsyncKeyState('N'))
+	{
+		spotDir.x -= 0.5 * camera.speed;
+	}
 								
-	if (GetAsyncKeyState('5')) //cubesOn = !cubesOn; this doesn't work efficientyly, too many passes. 
+	//TOGGLES LIGHTS LOCATION CUBES 
+	if (GetAsyncKeyState('5')) 
 	{
 		cubesOn = false; 
 	}
@@ -1574,18 +1603,12 @@ void LetsDrawSomeStuff::MoveCamera()
 	{
 		cubesOn = true;
 	}
-	//if (GetAsyncKeyState('0')) // TODO : Light Rotations OR TOGGLE FOLLOW
-	//{
-	//	//Quaternion rotation = Quaternion.Euler(x, y, z);
-	//	//Vector3 myVector = Vector3.one;
-	//	//Vector3 rotateVector = rotation * myVector;
-	//	//spotMat *= XMMatrixRotationZ(-0.01f * camera.speed); 
-	//}
+
 
 	// Near/Far Plane and Zoom adjustments
 	if (GetAsyncKeyState('Z'))
 	{
-		camera.nearPlane -= 0.1f; 
+		camera.nearPlane -= 0.2f; 
 		if (camera.nearPlane < 0.01f)
 		{
 			camera.nearPlane = 0.01f;
@@ -1593,33 +1616,47 @@ void LetsDrawSomeStuff::MoveCamera()
 	}
 	else if (GetAsyncKeyState('X'))
 	{
-		camera.nearPlane += 0.1f;
+		camera.nearPlane += 1.0f;
 	}
-	if (GetAsyncKeyState('N'))
+	if (GetAsyncKeyState('C'))
 	{
-		camera.farPlane -=  0.1f;
+		camera.farPlane -=  1.0f;
 	}
-	else if (GetAsyncKeyState('M'))
+	else if (GetAsyncKeyState('V'))
 	{
-		camera.farPlane += 0.1f; 
+		camera.farPlane += 1.0f; 
 	}
 
 	if (GetAsyncKeyState('T'))
 	{
-		camera.camZoom -= 0.001f; 
+		camera.camZoom -= 0.01f; 
+		{
+			camera.camZoom = -0.80f; 
+		}
 	}
 	else if (GetAsyncKeyState('Y'))
 	{
-		camera.camZoom += 0.001f;
+		camera.camZoom += 0.01f;
 	}
 
 	if (GetAsyncKeyState('1'))
 	{
 		scene = 1; //Monty Python Theme
+		pointPos = XMFLOAT3(0.0f, 0.0f, -5.0f);
+		pointMat = XMMatrixTranslation(0.0f, 0.0f, -5.0f);
+		spotPos = XMFLOAT3(10.0f, 1.0f, 30.0f);
+		spotMat = XMMatrixTranslation(10.0f, 1.0f, 30.0f);
+		spotDir = XMFLOAT3(0.0f, -2.0f, -10.0f);
 	}
 	if (GetAsyncKeyState('2'))
 	{
 		scene = 2; //Custom Theme
+		pointPos = XMFLOAT3(-11.0f, 3.0f, 0.0f);
+		pointMat = XMMatrixTranslation(-11.0f, 3.0f, 0.0f);
+		spotPos = XMFLOAT3(-14.0f, 3.0f, 25.0f);
+		spotMat = XMMatrixTranslation(-14.0f, 3.0f , 25.0f);
+		spotDir = XMFLOAT3(12.0f, -2.0f, -10.0f); 
+
 	}
 
 	// Update Camera
@@ -1655,5 +1692,7 @@ void LetsDrawSomeStuff::MoveCamera()
 	camera.yaw = 0; 
 	camera.pitch = 0; 
 	camera.speed = 0.5f; 
+
+
 }
 

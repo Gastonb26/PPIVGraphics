@@ -20,6 +20,7 @@ cbuffer ConstantBuffer : register (b0)
 	float3 spotPos;
 	float spotIntensity;
 	float4 spotCol;
+	float3 spotDirection;
 }
 
 struct VS_INPUT

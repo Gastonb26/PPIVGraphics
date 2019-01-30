@@ -7,7 +7,6 @@
 Texture2D txDiffuse : register(t0);
 SamplerState samLinear : register(s0);
 
-
 cbuffer ConstantBuffer : register (b0)
 {
 	matrix World; 
@@ -21,6 +20,7 @@ cbuffer ConstantBuffer : register (b0)
 	float3 spotPos; 
 	float spotIntensity;
 	float4 spotCol; 
+	float3 spotDirection; 
 }
 
 struct VS_INPUT
@@ -44,10 +44,10 @@ float4 PS(PS_INPUT input) : SV_Target
 	//Both lights Use
 	float3 lightDir = normalize(spotPos - input.WorldPosition);
 	
-	//SpotLight  //TODO change voutPutColor to point Color and add Spot Color to constant buffer? 
 	
+	//SpotLight  //TODO change voutPutColor to point Color and add Spot Color to constant buffer? 
 	float lightRat = saturate(dot(lightDir, input.Norm));
-	float3 coneDir = normalize(float3(0.0f,-2.0f, -10.0f));
+	float3 coneDir = normalize(spotDirection);
 
 	input.Norm = normalize(input.Norm);
 	float surfaceRat = saturate(dot(-lightDir, coneDir));

@@ -58,6 +58,7 @@
     <ClInclude Include="HHG3D.h" />
     <ClInclude Include="cloud.h" />
     <ClInclude Include="sephiroth.h" />
+    <ClInclude Include="aerith.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Gateware Source">
