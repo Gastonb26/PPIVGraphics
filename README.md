@@ -36,9 +36,9 @@ Light Control & Movement:
 
 I/K/J/L -------------> move on x/z axis
 
-O/U ----------------> move up and down on y axis
+O/U ---------------> move up and down on y axis
 
-N/M ----------------> rotate light (SPOT LIGHT ONLY) 
+N/M --------------> rotate light (SPOT LIGHT ONLY) 
 
 Toggle Light Indicators: (cubes to know where lights are located): 
 =
