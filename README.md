@@ -1,11 +1,31 @@
 # PPIVGraphics
 
-Camera Movement Controls : W S A D 
+Camera Movement Controls: 
+W/S/A/D ------> forward, back, left, right
+ARROW KEYS ------> yaw and pitch
+Q/E ------> roll
 
-Yaw and Pitch (look up and to the sides) : Arrows keys 
+Camera Zoom: 
+T/Y ------> zoom -/+
 
-Camera Zoom : T =  zoom out || Y =  zoom in
+Camera FOV: 
+Z/X ------> adjust near plane -/+
+N/M ------> adjust far plane -/+
 
-Camera FOV : Z = near plane subtract || X = near plane add || N = Far plane subtract || M = far plane add 
+Change Themes/Scenes: 
+1 ------> Render Monty Python Scene
+2 ------> Render Custom Scene (FFVII) 
 
-Point Light Control : I K J L = x & z axis movment || U O = y axis movment 
+Light Control Selection: 
+8 ------> PointLight 
+9 ------> Spot Light
+
+Light Control: 
+I K J L ------> move on x/z axis
+U O ------> move up and down on y axis
+
+Toggle Light Indicators (cubes to know where lights are located): 
+5 ------> off
+6 ------> on
+
+
