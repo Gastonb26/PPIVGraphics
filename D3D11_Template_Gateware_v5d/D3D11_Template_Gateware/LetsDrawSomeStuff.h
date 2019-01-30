@@ -876,7 +876,8 @@ LetsDrawSomeStuff::~LetsDrawSomeStuff()
 	cloudIB->Release(); 
 	sephirothVB->Release(); 
 	sephirothIB->Release(); 
-
+	aerithIB->Release(); 
+	aerithVB->Release(); 
 
 	//TEXTURES 
 	textureResource->Release(); //fake metal tex 
