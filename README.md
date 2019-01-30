@@ -9,6 +9,8 @@ ARROW KEYS ------> yaw and pitch
 
 Q/E -----------------> roll
 
+(Hold) SHIFT--------> Speed Up all movement (including lights)
+
 Camera Zoom & FOV: 
 =
 
